@@ -138,15 +138,15 @@ The `RegisteredUserService.upsertCpOAuthUser(data)` method SHALL:
 
 The `auth.cpOAuth` configuration object SHALL contain:
 
-| Field                 | Type     | Default                                                    | Description                                     |
-| --------------------- | -------- | ---------------------------------------------------------- | ----------------------------------------------- |
-| `discoveryUrl`        | string   | `https://www.cpoauth.com/.well-known/openid-configuration` | OpenID Connect discovery document URL           |
-| `clientId`            | string   | empty string                                               | CP OAuth client ID                              |
-| `clientSecret`        | string   | empty string                                               | CP OAuth client secret for confidential clients |
-| `redirectUri`         | string   | empty string                                               | Backend callback URL registered at CP OAuth     |
-| `frontendRedirectUri` | string   | `/auth/callback`                                           | Frontend route receiving the issued local token |
-| `scopes`              | string[] | `['openid', 'profile', 'link:luogu']`                      | Scopes requested from CP OAuth                  |
-| `stateExpireSeconds`  | number   | 600                                                        | Redis TTL for OAuth state and PKCE verifier     |
+| Field                 | Type     | Default                                                    | Description                                                                                       |
+| --------------------- | -------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `discoveryUrl`        | string   | `https://www.cpoauth.com/.well-known/openid-configuration` | OpenID Connect discovery document URL                                                             |
+| `clientId`            | string   | empty string                                               | CP OAuth client ID                                                                                |
+| `clientSecret`        | string   | empty string                                               | CP OAuth client secret for confidential clients                                                   |
+| `redirectUri`         | string   | empty string                                               | Backend callback URL registered at CP OAuth                                                       |
+| `frontendRedirectUri` | string   | `/auth/callback`                                           | Frontend URL receiving the issued local token. It may be an absolute URL or a root-relative path. |
+| `scopes`              | string[] | `['openid', 'profile', 'link:luogu']`                      | Scopes requested from CP OAuth                                                                    |
+| `stateExpireSeconds`  | number   | 600                                                        | Redis TTL for OAuth state and PKCE verifier                                                       |
 
 ### 6.2 GET /auth/cp/login
 
@@ -186,31 +186,33 @@ Complete the CP OAuth authorization code flow.
 
 **Behavior:**
 
-1. If `error` is present, redirect to `frontendRedirectUri` with query parameters `error` and `message`.
-2. If `code` or `state` is absent, redirect to `frontendRedirectUri` with `error=invalid_request`.
-3. Read Redis key `auth:cp:state:{state}`.
-4. If no state data exists, redirect to `frontendRedirectUri` with `error=invalid_state`.
-5. Delete Redis key `auth:cp:state:{state}` before exchanging the code.
-6. Exchange `code` at the discovered `token_endpoint` using JSON request body:
+1. If `frontendRedirectUri` is an absolute URL, preserve its origin, path, and existing query parameters when appending callback query parameters.
+2. If `frontendRedirectUri` is a root-relative path, redirect to that path with appended callback query parameters.
+3. If `error` is present, redirect to `frontendRedirectUri` with query parameters `error` and `message`.
+4. If `code` or `state` is absent, redirect to `frontendRedirectUri` with `error=invalid_request`.
+5. Read Redis key `auth:cp:state:{state}`.
+6. If no state data exists, redirect to `frontendRedirectUri` with `error=invalid_state`.
+7. Delete Redis key `auth:cp:state:{state}` before exchanging the code.
+8. Exchange `code` at the discovered `token_endpoint` using JSON request body:
     - `grant_type=authorization_code`
     - `code=code`
     - `redirect_uri=auth.cpOAuth.redirectUri`
     - `client_id=auth.cpOAuth.clientId`
     - `code_verifier=stored codeVerifier`
     - `client_secret=auth.cpOAuth.clientSecret` only when non-empty
-7. Require a string `access_token` in the token response.
-8. Fetch the discovered `userinfo_endpoint` with header `Authorization: Bearer {access_token}`.
-9. Require a non-empty string `sub` in the userinfo response.
-10. Require `linked_accounts` to contain an object with `platform='luogu'` and numeric `platformUid`.
-11. Upsert a registered user using:
+9. Require a string `access_token` in the token response.
+10. Fetch the discovered `userinfo_endpoint` with header `Authorization: Bearer {access_token}`.
+11. Require a non-empty string `sub` in the userinfo response.
+12. Require `linked_accounts` to contain an object with `platform='luogu'` and numeric `platformUid`.
+13. Upsert a registered user using:
     - `cpOAuthSub = sub`
     - `luoguUid = Number(platformUid)`
     - `name = platformUsername` when present, otherwise `display_name`, otherwise `username`, otherwise `User {luoguUid}`
     - `avatarUrl = avatar_url` when present
-12. The callback SHALL NOT write to the `user` table.
-13. Find an existing local token where `uid` equals `registered_user.id`.
-14. If no token exists, create a new 32-character hex token with `uid=registered_user.id` and `role=ROLE_DEFAULT`.
-15. Redirect to `frontendRedirectUri` with query parameters:
+14. The callback SHALL NOT write to the `user` table.
+15. Find an existing local token where `uid` equals `registered_user.id`.
+16. If no token exists, create a new 32-character hex token with `uid=registered_user.id` and `role=ROLE_DEFAULT`.
+17. Redirect to `frontendRedirectUri` with query parameters:
     - `token=local token`
     - `uid=registered user ID`
     - `role=local role`

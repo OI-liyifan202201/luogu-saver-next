@@ -477,7 +477,7 @@ setInterval(() => {
     margin-left: 16px;
 }
 .router-view {
-    max-width: 1440px;
+    max-width: min(1680px, 100%);
     margin: 0 auto;
     min-height: calc(100vh - 48px);
 }

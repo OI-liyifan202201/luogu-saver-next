@@ -12,7 +12,9 @@ function getFrontendCallbackUrl(params: Record<string, string | number | undefin
     for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) callbackUrl.searchParams.set(key, String(value));
     }
-    return `${callbackUrl.pathname}${callbackUrl.search}`;
+    return config.auth.cpOAuth.frontendRedirectUri.startsWith('http')
+        ? callbackUrl.toString()
+        : `${callbackUrl.pathname}${callbackUrl.search}`;
 }
 
 router.get('/cp/login', async (ctx: Context) => {

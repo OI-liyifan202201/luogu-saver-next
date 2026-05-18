@@ -2,9 +2,10 @@ import axios from 'axios';
 import { getDeviceId } from '@/utils/device-id.ts';
 import { CONSENT_TRACKING_STORAGE_KEY } from '@/utils/constants.ts';
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
+import { API_BASE_URL } from '@/utils/api-base-url.ts';
 
 export const apiFetch = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '/api',
+    baseURL: API_BASE_URL,
     timeout: 30000
 });
 

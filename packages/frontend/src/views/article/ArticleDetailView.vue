@@ -242,30 +242,14 @@ onMounted(() => {
 
 <template>
     <n-spin :show="isSaving" description="正在保存并处理..." class="saving-spin">
-        <n-grid class="article-layout" :x-gap="20" cols="1 l:12" responsive="screen">
-            <n-gi :span="1" class="sidebar-left">
-                <SidebarWidget
-                    v-if="tocItems.length > 0"
-                    title="目录"
-                    :icon="ListOutline"
-                    class="toc-card"
-                >
-                    <n-anchor :show-rail="true" :show-background="true" type="block" :bound="100">
-                        <template v-for="item in tocItems" :key="item.href">
-                            <n-anchor-link :title="item.title" :href="item.href">
-                                <n-anchor-link
-                                    v-for="child in item.children"
-                                    :key="child.href"
-                                    :title="child.title"
-                                    :href="child.href"
-                                />
-                            </n-anchor-link>
-                        </template>
-                    </n-anchor>
-                </SidebarWidget>
-            </n-gi>
-
-            <n-gi :span="8" class="main-content">
+        <div
+            class="article-layout"
+            :class="{
+                'has-toc': tocItems.length > 0,
+                'has-history': versionHistory.length > 0
+            }"
+        >
+            <div class="article-header">
                 <LoadingSkeleton :loading="loading">
                     <template #skeleton>
                         <Card>
@@ -395,8 +379,27 @@ onMounted(() => {
                         </Card>
                     </div>
                 </LoadingSkeleton>
+            </div>
 
-                <div style="margin-top: 16px">
+            <aside v-if="tocItems.length > 0" class="sidebar-left">
+                <SidebarWidget title="目录" :icon="ListOutline" class="toc-card">
+                    <n-anchor :show-rail="true" :show-background="true" type="block" :bound="100">
+                        <template v-for="item in tocItems" :key="item.href">
+                            <n-anchor-link :title="item.title" :href="item.href">
+                                <n-anchor-link
+                                    v-for="child in item.children"
+                                    :key="child.href"
+                                    :title="child.title"
+                                    :href="child.href"
+                                />
+                            </n-anchor-link>
+                        </template>
+                    </n-anchor>
+                </SidebarWidget>
+            </aside>
+
+            <main class="main-content">
+                <div>
                     <LoadingSkeleton :loading="loading">
                         <template #skeleton>
                             <Card>
@@ -512,9 +515,9 @@ onMounted(() => {
                         </Card>
                     </LoadingSkeleton>
                 </div>
-            </n-gi>
+            </main>
 
-            <n-gi v-if="versionHistory.length > 0" :span="3" class="sidebar-right">
+            <aside v-if="versionHistory.length > 0" class="sidebar-right">
                 <SidebarWidget title="历史版本" :icon="TimeOutline" class="version-card">
                     <n-timeline>
                         <n-timeline-item
@@ -529,8 +532,8 @@ onMounted(() => {
                         />
                     </n-timeline>
                 </SidebarWidget>
-            </n-gi>
-        </n-grid>
+            </aside>
+        </div>
     </n-spin>
 
     <div v-if="hasUpdate" class="update-floater">
@@ -549,11 +552,57 @@ onMounted(() => {
 }
 
 .article-layout {
-    max-width: 1380px;
+    width: min(100%, 1600px);
+    max-width: none;
     margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    grid-template-areas:
+        'header'
+        'main';
+}
+
+.article-layout.has-toc {
+    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-areas:
+        'toc header'
+        'toc main';
+}
+
+.article-layout.has-history {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-areas:
+        'header history'
+        'main history';
+}
+
+.article-layout.has-toc.has-history {
+    grid-template-columns: 280px minmax(0, 1fr) 280px;
+    grid-template-areas:
+        'toc header history'
+        'toc main history';
+}
+
+.article-header {
+    grid-area: header;
+}
+
+.sidebar-left {
+    grid-area: toc;
+    min-width: 0;
+    align-self: start;
+}
+
+.sidebar-right {
+    grid-area: history;
+    min-width: 0;
+    align-self: start;
 }
 
 .main-content {
+    grid-area: main;
     min-width: 0;
 }
 
@@ -561,6 +610,40 @@ onMounted(() => {
 .version-card {
     position: sticky;
     top: 20px;
+    margin-top: 0;
+}
+
+.toc-card :deep(.n-anchor) {
+    max-width: none;
+}
+
+.toc-card :deep(.n-anchor-link__title) {
+    white-space: normal;
+    line-height: 1.45;
+}
+
+@media (max-width: 1200px) {
+    .article-layout,
+    .article-layout.has-toc,
+    .article-layout.has-history,
+    .article-layout.has-toc.has-history {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            'header'
+            'toc'
+            'main'
+            'history';
+    }
+
+    .sidebar-left,
+    .sidebar-right {
+        min-width: 0;
+    }
+
+    .toc-card,
+    .version-card {
+        position: static;
+    }
 }
 
 .meta-row {
