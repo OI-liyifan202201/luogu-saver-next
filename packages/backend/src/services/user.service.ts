@@ -8,6 +8,7 @@ import {
     getServiceRepository,
     saveServiceEntity
 } from '@/services/helpers/repository.helper';
+import { UserColor } from '@/shared/user';
 
 export class UserService {
     /*
@@ -52,6 +53,22 @@ export class UserService {
 
         const repository = getServiceRepository<User>(User, manager);
         const user = repository.create(data);
+        await repository.upsert(user, ['id']);
+        return user;
+    }
+
+    @CacheEvict((data: Partial<User>) => (data.id === undefined ? [] : `user:${data.id}`))
+    static async upsertCpOAuthUser(data: Partial<User>, manager?: EntityManager): Promise<User> {
+        if (!Number.isInteger(data.id) || data.id === undefined || data.id <= 0) {
+            throw new Error('Positive Luogu user ID is required');
+        }
+
+        const repository = getServiceRepository<User>(User, manager);
+        const user = repository.create({
+            id: data.id,
+            name: data.name || `User ${data.id}`,
+            color: data.color || UserColor.GRAY
+        });
         await repository.upsert(user, ['id']);
         return user;
     }

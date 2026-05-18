@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The authentication system validates API requests using Bearer tokens stored in the database. It provides middleware-based authentication for Koa applications.
+The authentication system signs users in through CP OAuth only. It validates API requests using Bearer tokens stored in the database. It provides middleware-based authentication for Koa applications.
 
 ## 2. Token Entity
 
@@ -22,8 +22,8 @@ Table name: `token`
 The static method `Token.validate(token: string)` SHALL:
 
 1. Query the `token` table for a record where `id` equals the provided token.
-2. If a record exists, return the `uid` field value.
-3. If no record exists, return `null`.
+2. If a record exists, return `[uid, role]`.
+3. If no record exists, return an empty array.
 
 ## 3. Authorization Middleware
 
@@ -37,8 +37,8 @@ For each incoming request:
 2. If present:
     - Extract the token by removing the `Bearer ` prefix.
     - Call `Token.validate(token)`.
-    - If validation returns a user ID, attach it to `ctx.userId`.
-3. If the header is absent or validation fails, `ctx.userId` remains `undefined`.
+    - If validation returns a non-empty array, attach `{ id: uid, role }` to `ctx.user`.
+3. If the header is absent or validation fails, `ctx.user` remains `undefined`.
 4. Always call `next()` to continue request processing.
 
 ### 3.2 Pseudocode
@@ -47,9 +47,9 @@ For each incoming request:
 function authorization(ctx, next):
     if ctx.headers['authorization'] exists:
         token = ctx.headers['authorization'].replace('Bearer ', '')
-        uid = await Token.validate(token)
-        if uid is not null:
-            ctx.userId = uid
+        data = await Token.validate(token)
+        if data is not empty:
+            ctx.user = { id: data[0], role: data[1] }
     await next()
 ```
 
@@ -97,22 +97,128 @@ The `UserService.upsertLuoguUser(data)` method SHALL:
 5. Execute as one database upsert operation so concurrent saves for the same user do not fail with a duplicate primary-key error.
 6. After a successful upsert, evict Redis cache key `user:{data.id}`.
 
-## 5. Authorization States
+### 4.5 CP OAuth User Upsert
 
-| `ctx.userId` | Interpretation                   |
-| ------------ | -------------------------------- |
-| `undefined`  | Unauthenticated request          |
-| `number`     | Authenticated user with given ID |
+The `UserService.upsertCpOAuthUser(data)` method SHALL:
 
-## 6. Security Constraints
+1. Require `data.id` to be a positive integer Luogu user ID.
+2. Use `data.id` as the unique user key.
+3. Use `data.name` as the user display name.
+4. Use `UserColor.GRAY` as the user color when CP OAuth does not provide a Luogu color.
+5. Insert a user row when no row exists for `data.id`.
+6. Update the existing row when a row exists for `data.id`.
+7. Execute as one database upsert operation so concurrent saves for the same user do not fail with a duplicate primary-key error.
+8. After a successful upsert, evict Redis cache key `user:{data.id}`.
+
+## 5. CP OAuth Login
+
+### 5.1 Configuration
+
+The `auth.cpOAuth` configuration object SHALL contain:
+
+| Field                 | Type     | Default                                                    | Description                                     |
+| --------------------- | -------- | ---------------------------------------------------------- | ----------------------------------------------- |
+| `discoveryUrl`        | string   | `https://www.cpoauth.com/.well-known/openid-configuration` | OpenID Connect discovery document URL           |
+| `clientId`            | string   | empty string                                               | CP OAuth client ID                              |
+| `clientSecret`        | string   | empty string                                               | CP OAuth client secret for confidential clients |
+| `redirectUri`         | string   | empty string                                               | Backend callback URL registered at CP OAuth     |
+| `frontendRedirectUri` | string   | `/auth/callback`                                           | Frontend route receiving the issued local token |
+| `scopes`              | string[] | `['openid', 'profile', 'link:luogu']`                      | Scopes requested from CP OAuth                  |
+| `stateExpireSeconds`  | number   | 600                                                        | Redis TTL for OAuth state and PKCE verifier     |
+
+### 5.2 GET /auth/cp/login
+
+Start the CP OAuth authorization code flow.
+
+**Request:**
+
+- Query parameter: `redirect` (string, optional) - Frontend path used after login. If absent, use `/`.
+
+**Behavior:**
+
+1. If `auth.cpOAuth.clientId` is empty, return 500.
+2. If `auth.cpOAuth.redirectUri` is empty, return 500.
+3. Fetch the CP OAuth discovery document from `discoveryUrl`.
+4. Generate `state` as at least 128 bits of random data encoded as hex.
+5. Generate a PKCE `code_verifier` as at least 256 bits of random data encoded as base64url.
+6. Compute `code_challenge = BASE64URL(SHA256(code_verifier))`.
+7. Store JSON `{ codeVerifier, redirect }` in Redis key `auth:cp:state:{state}` with TTL `stateExpireSeconds`.
+8. Redirect to the discovered `authorization_endpoint` with these query parameters:
+    - `response_type=code`
+    - `client_id=auth.cpOAuth.clientId`
+    - `redirect_uri=auth.cpOAuth.redirectUri`
+    - `scope=auth.cpOAuth.scopes` joined by a single space
+    - `state=state`
+    - `code_challenge=code_challenge`
+    - `code_challenge_method=S256`
+
+### 5.3 GET /auth/cp/callback
+
+Complete the CP OAuth authorization code flow.
+
+**Request:**
+
+- Query parameter: `code` (string, required)
+- Query parameter: `state` (string, required)
+- Query parameter: `error` (string, optional)
+
+**Behavior:**
+
+1. If `error` is present, redirect to `frontendRedirectUri` with query parameters `error` and `message`.
+2. If `code` or `state` is absent, redirect to `frontendRedirectUri` with `error=invalid_request`.
+3. Read Redis key `auth:cp:state:{state}`.
+4. If no state data exists, redirect to `frontendRedirectUri` with `error=invalid_state`.
+5. Delete Redis key `auth:cp:state:{state}` before exchanging the code.
+6. Exchange `code` at the discovered `token_endpoint` using JSON request body:
+    - `grant_type=authorization_code`
+    - `code=code`
+    - `redirect_uri=auth.cpOAuth.redirectUri`
+    - `client_id=auth.cpOAuth.clientId`
+    - `code_verifier=stored codeVerifier`
+    - `client_secret=auth.cpOAuth.clientSecret` only when non-empty
+7. Require a string `access_token` in the token response.
+8. Fetch the discovered `userinfo_endpoint` with header `Authorization: Bearer {access_token}`.
+9. Require `linked_accounts` to contain an object with `platform='luogu'` and numeric `platformUid`.
+10. Upsert a local user using:
+    - `id = Number(platformUid)`
+    - `name = platformUsername` when present, otherwise `display_name`, otherwise `username`, otherwise `User {id}`
+11. Find an existing local token by `uid`.
+12. If no token exists, create a new 32-character hex token with role `ROLE_DEFAULT`.
+13. Redirect to `frontendRedirectUri` with query parameters:
+    - `token=local token`
+    - `uid=local user ID`
+    - `role=local role`
+    - `redirect=stored redirect`
+
+### 5.4 GET /auth/me
+
+Return the authenticated local user.
+
+**Response:**
+
+- 200: `{ uid, role, user }` when `ctx.user` exists.
+- 401: `Unauthorized` when `ctx.user` does not exist.
+
+## 6. Authorization States
+
+| `ctx.user`   | Interpretation                      |
+| ------------ | ----------------------------------- |
+| `undefined`  | Unauthenticated request             |
+| `{id, role}` | Authenticated user with ID and role |
+
+## 7. Security Constraints
 
 1. Tokens are stored as plaintext in the database.
 2. Token validation is performed on every request with an Authorization header.
-3. The middleware does NOT reject unauthenticated requests; downstream handlers must check `ctx.userId` if authentication is required.
+3. The middleware does NOT reject unauthenticated requests; downstream handlers must check `ctx.user` if authentication is required.
+4. CP OAuth state values are single-use because the callback deletes the Redis state key before token exchange.
+5. CP OAuth login SHALL NOT accept a CP OAuth user without a linked Luogu account.
 
-## 7. File Locations
+## 8. File Locations
 
 - Token entity: `packages/backend/src/entities/token.ts`
 - User entity: `packages/backend/src/entities/user.ts`
 - Authorization middleware: `packages/backend/src/middlewares/authorization.ts`
 - User color enum: `packages/backend/src/shared/user.ts`
+- CP OAuth service: `packages/backend/src/services/auth.service.ts`
+- Auth router: `packages/backend/src/routers/auth.router.ts`

@@ -6,6 +6,7 @@ import taskRouter from './task.router';
 import workflowRouter from './workflow.router';
 import censorshipRouter from './censorship.router';
 import tokenRouter from './token.router';
+import authRouter from './auth.router';
 import { DefaultState, Context } from 'koa';
 
 const router = new Router<DefaultState, Context>();
@@ -17,5 +18,6 @@ router.use(taskRouter.routes(), taskRouter.allowedMethods());
 router.use(workflowRouter.routes(), workflowRouter.allowedMethods());
 router.use(censorshipRouter.routes(), censorshipRouter.allowedMethods());
 router.use(tokenRouter.routes(), tokenRouter.allowedMethods());
+router.use(authRouter.routes(), authRouter.allowedMethods());
 
 export default router;

@@ -12,6 +12,17 @@ const trackingStorage = useLocalStorage(CONSENT_TRACKING_STORAGE_KEY, 'denied');
 
 apiFetch.interceptors.request.use(
     config => {
+        const rawToken = localStorage.getItem('auth_token');
+        let token = '';
+        try {
+            token = rawToken ? JSON.parse(rawToken) : '';
+        } catch {
+            token = '';
+        }
+        if (token) {
+            config.headers!['Authorization'] = `Bearer ${token}`;
+        }
+
         if (trackingStorage.value === 'allowed') {
             config.headers!['X-Consent-Tracking'] = 'true';
             config.headers!['X-Device-ID'] = getDeviceId();

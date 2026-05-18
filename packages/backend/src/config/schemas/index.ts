@@ -4,6 +4,7 @@ import { DbSchema, RedisSchema, ChromaSchema } from './infrastructure';
 import { RecommendationSchema, QueueSchema } from './business';
 import { LLMConfigSchema } from './llm';
 import { VerificationSchema } from './verification';
+import { AuthSchema } from './auth';
 
 export const AppConfigSchema = ServerSchema.extend({
     db: DbSchema,
@@ -12,7 +13,8 @@ export const AppConfigSchema = ServerSchema.extend({
     recommendation: RecommendationSchema,
     queue: QueueSchema,
     llm: LLMConfigSchema,
-    verification: VerificationSchema
+    verification: VerificationSchema,
+    auth: z.preprocess(value => value ?? {}, AuthSchema)
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
