@@ -2,7 +2,7 @@ import Router from 'koa-router';
 import { Context, DefaultState } from 'koa';
 import { config } from '@/config';
 import { AuthService } from '@/services/auth.service';
-import { UserService } from '@/services/user.service';
+import { RegisteredUserService } from '@/services/registered-user.service';
 import { logger } from '@/lib/logger';
 
 const router = new Router<DefaultState, Context>({ prefix: '/auth' });
@@ -74,8 +74,8 @@ router.get('/me', async (ctx: Context) => {
         return;
     }
 
-    const user = await UserService.getUserById(ctx.user.id);
-    ctx.success({ uid: ctx.user.id, role: ctx.user.role, user });
+    const registeredUser = await RegisteredUserService.getById(ctx.user.id);
+    ctx.success({ uid: ctx.user.id, role: ctx.user.role, registeredUser });
 });
 
 export default router;

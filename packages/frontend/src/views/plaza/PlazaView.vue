@@ -110,110 +110,139 @@ const goToDetail = (id: string) => {
 </script>
 
 <template>
-    <CardTitle title="文章广场" :icon="GlobeOutline" class="feed-header">
-        ARTICLE PLAZA!
-    </CardTitle>
+    <div class="plaza-page">
+        <CardTitle title="文章广场" :icon="GlobeOutline" class="feed-header">
+            ARTICLE PLAZA!
+        </CardTitle>
 
-    <div class="article-list">
-        <div v-for="article in articles" :key="article.id" class="article-item">
-            <Card
-                :title="article.title"
-                :icon="NewspaperOutline"
-                class="clickable-card"
-                @click="goToDetail(article.id)"
-            >
-                <template #title-extra>
-                    <n-tag
-                        v-if="article.reason === 'hot'"
-                        :color="{
-                            textColor: '#ff6200',
-                            color: 'rgba(255, 98, 0, 0.2)',
-                            borderColor: '#ff6200'
-                        }"
-                        size="small"
+        <div class="feed-shell">
+            <div class="article-list">
+                <div v-for="article in articles" :key="article.id" class="article-item">
+                    <Card
+                        :title="article.title"
+                        :icon="NewspaperOutline"
+                        class="clickable-card"
+                        @click="goToDetail(article.id)"
                     >
-                        <template #icon>
-                            <n-icon :component="FireAlt" />
+                        <template #title-extra>
+                            <n-tag
+                                v-if="article.reason === 'hot'"
+                                :color="{
+                                    textColor: '#ff6200',
+                                    color: 'rgba(255, 98, 0, 0.2)',
+                                    borderColor: '#ff6200'
+                                }"
+                                size="small"
+                            >
+                                <template #icon>
+                                    <n-icon :component="FireAlt" />
+                                </template>
+                                热门
+                            </n-tag>
+                            <n-tag
+                                v-else-if="article.reason === 'vector'"
+                                :color="{
+                                    textColor: '#00aaff',
+                                    color: 'rgba(0, 170, 255, 0.2)',
+                                    borderColor: '#00aaff'
+                                }"
+                                size="small"
+                            >
+                                <template #icon>
+                                    <n-icon :component="SparklesOutline" />
+                                </template>
+                                猜你想看
+                            </n-tag>
                         </template>
-                        热门
-                    </n-tag>
-                    <n-tag
-                        v-else-if="article.reason === 'vector'"
-                        :color="{
-                            textColor: '#00aaff',
-                            color: 'rgba(0, 170, 255, 0.2)',
-                            borderColor: '#00aaff'
-                        }"
-                        size="small"
-                    >
-                        <template #icon>
-                            <n-icon :component="SparklesOutline" />
-                        </template>
-                        猜你想看
-                    </n-tag>
-                </template>
-                <div class="article-summary">{{ article.summary || '暂无预览...' }}...</div>
+                        <div class="article-summary">{{ article.summary || '暂无预览...' }}...</div>
 
-                <n-divider style="margin: 12px 0" />
+                        <n-divider style="margin: 12px 0" />
 
-                <div class="article-meta">
-                    <div class="left">
-                        <UserLink :user="article.author" show-avatar />
-                        <n-tag
-                            :color="{
-                                textColor: getCategoryColor(article.category),
-                                color: hexToRgba(getCategoryColor(article.category), 0.2),
-                                borderColor: getCategoryColor(article.category)
-                            }"
-                            size="small"
-                            style="margin-left: 8px"
-                        >
-                            <template #icon>
-                                <n-icon :component="getCategoryIcon(article.category)" />
-                            </template>
-                            {{ getCategoryLabel(article.category) }}
-                        </n-tag>
-                    </div>
-                    <div class="right">
-                        <n-button
-                            text
-                            size="small"
-                            type="primary"
-                            @click.stop="goToDetail(article.id)"
-                        >
-                            阅读全文
-                            <n-icon :component="ArrowForwardOutline" style="margin-left: 4px" />
-                        </n-button>
-                    </div>
+                        <div class="article-meta">
+                            <div class="left">
+                                <UserLink :user="article.author" show-avatar />
+                                <n-tag
+                                    :color="{
+                                        textColor: getCategoryColor(article.category),
+                                        color: hexToRgba(getCategoryColor(article.category), 0.2),
+                                        borderColor: getCategoryColor(article.category)
+                                    }"
+                                    size="small"
+                                >
+                                    <template #icon>
+                                        <n-icon :component="getCategoryIcon(article.category)" />
+                                    </template>
+                                    {{ getCategoryLabel(article.category) }}
+                                </n-tag>
+                            </div>
+                            <div class="right">
+                                <n-button
+                                    text
+                                    size="small"
+                                    type="primary"
+                                    @click.stop="goToDetail(article.id)"
+                                >
+                                    阅读全文
+                                    <n-icon
+                                        :component="ArrowForwardOutline"
+                                        style="margin-left: 4px"
+                                    />
+                                </n-button>
+                            </div>
+                        </div>
+                    </Card>
                 </div>
-            </Card>
-        </div>
-    </div>
-
-    <div ref="loadTrigger" class="load-trigger">
-        <div v-if="loading" class="loading-state">
-            <n-spin size="small" />
-            <span style="margin-left: 8px; color: #999">正在加载更多推荐...</span>
+            </div>
         </div>
 
-        <div v-else-if="error" class="error-state">
-            <span style="color: #d03050">加载失败</span>
-            <n-button size="small" style="margin-left: 10px" @click="loadMore">重试</n-button>
-        </div>
+        <div ref="loadTrigger" class="load-trigger">
+            <div v-if="loading" class="loading-state">
+                <n-spin size="small" />
+                <span style="margin-left: 8px; color: #64748b">正在加载更多推荐...</span>
+            </div>
 
-        <n-empty v-else-if="noMore && everReturned" description="没有更多推荐了（你是真能看啊）" />
-        <n-empty v-else-if="noMore && !everReturned" description="暂无推荐（你是真能看啊）" />
+            <div v-else-if="error" class="error-state">
+                <span style="color: #d03050">加载失败</span>
+                <n-button size="small" style="margin-left: 10px" @click="loadMore">重试</n-button>
+            </div>
+
+            <n-empty
+                v-else-if="noMore && everReturned"
+                description="没有更多推荐了（你是真能看啊）"
+            />
+            <n-empty v-else-if="noMore && !everReturned" description="暂无推荐（你是真能看啊）" />
+        </div>
     </div>
 </template>
 
 <style scoped>
+.plaza-page {
+    max-width: 1220px;
+    margin: 0 auto;
+}
+
 .feed-header {
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+}
+
+.feed-shell {
+    width: 100%;
+}
+
+.article-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: stretch;
 }
 
 .article-item {
-    margin-bottom: 16px;
-    transition: transform 0.2s;
+    min-width: 0;
+    display: flex;
+}
+
+.article-item :deep(.saver-card) {
+    width: 100%;
 }
 
 .clickable-card {
@@ -221,10 +250,10 @@ const goToDetail = (id: string) => {
 }
 
 .article-summary {
-    color: #555;
+    color: #475569;
     font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 8px;
+    line-height: 1.65;
+    margin-bottom: 6px;
 }
 
 .article-meta {
@@ -232,11 +261,14 @@ const goToDetail = (id: string) => {
     justify-content: space-between;
     align-items: center;
     font-size: 14px;
+    gap: 12px;
 }
 
 .article-meta .left {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .load-trigger {
@@ -251,5 +283,18 @@ const goToDetail = (id: string) => {
 .error-state {
     display: flex;
     align-items: center;
+}
+
+@media (max-width: 900px) {
+    .article-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .article-meta {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 </style>

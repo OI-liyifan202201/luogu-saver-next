@@ -39,7 +39,8 @@ const effectiveBackgroundColor = computed(() => {
 
 const cardStyle = computed(
     (): CSSProperties => ({
-        backgroundColor: effectiveBackgroundColor.value
+        backgroundColor: effectiveBackgroundColor.value,
+        boxShadow: themeVars.value.cardShadow
     })
 );
 
@@ -79,38 +80,50 @@ const showHeader = computed(() => {
 
 <style scoped>
 .saver-card {
-    padding: 24px;
+    padding: 20px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(47, 109, 181, 0.08);
     transition:
         transform 0.3s ease,
-        box-shadow 0.3s ease;
+        box-shadow 0.3s ease,
+        border-color 0.3s ease;
     display: flex;
     flex-direction: column;
 }
 
 .saver-card.is-hoverable:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    border-color: rgba(47, 109, 181, 0.16);
+    box-shadow: 0 14px 28px rgba(47, 109, 181, 0.1) !important;
 }
 
 .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .card-title-wrapper {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+}
+
+.card-title-wrapper > .n-icon {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(47, 109, 181, 0.08);
 }
 
 .card-title {
     font-weight: bold;
     font-size: 18px;
-    line-height: 1;
+    line-height: 1.25;
 }
 
 .card-content {

@@ -4,7 +4,7 @@ import { config } from '@/config';
 import { redisClient } from '@/lib/redis';
 import { Token } from '@/entities/token';
 import { ROLE_DEFAULT } from '@/shared/permission';
-import { UserService } from '@/services/user.service';
+import { RegisteredUserService } from '@/services/registered-user.service';
 
 type DiscoveryDocument = {
     authorization_endpoint: string;
@@ -28,8 +28,10 @@ type CpOAuthLinkedAccount = {
 };
 
 type CpOAuthUserInfo = {
+    sub?: string;
     username?: string;
     display_name?: string;
+    avatar_url?: string;
     linked_accounts?: CpOAuthLinkedAccount[];
 };
 
@@ -189,23 +191,27 @@ export class AuthService {
 
         const accessToken = await this.exchangeCode(code, storedState.codeVerifier);
         const userInfo = await this.fetchUserInfo(accessToken);
-        const luoguAccount = this.extractLuoguAccount(userInfo);
-        const uid = Number(luoguAccount.platformUid);
+        if (!userInfo.sub) throw new Error('CP OAuth did not return sub');
 
-        if (!Number.isInteger(uid) || uid <= 0) {
+        const luoguAccount = this.extractLuoguAccount(userInfo);
+        const luoguUid = Number(luoguAccount.platformUid);
+
+        if (!Number.isInteger(luoguUid) || luoguUid <= 0) {
             throw new Error('Linked Luogu account ID is invalid');
         }
 
-        await UserService.upsertCpOAuthUser({
-            id: uid,
+        const registeredUser = await RegisteredUserService.upsertCpOAuthUser({
+            cpOAuthSub: userInfo.sub,
+            luoguUid,
             name:
                 luoguAccount.platformUsername ||
                 userInfo.display_name ||
                 userInfo.username ||
-                `User ${uid}`
+                `User ${luoguUid}`,
+            avatarUrl: userInfo.avatar_url
         });
 
-        const token = await this.getOrCreateLocalToken(uid);
+        const token = await this.getOrCreateLocalToken(registeredUser.id);
         return {
             token: token.id,
             uid: token.uid,

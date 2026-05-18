@@ -4,6 +4,8 @@
 
 The authentication system signs users in through CP OAuth only. It validates API requests using Bearer tokens stored in the database. It provides middleware-based authentication for Koa applications.
 
+The `user` table is not an authentication table. The `user` table stores Luogu users that appear as article or paste authors. CP OAuth login SHALL NOT insert, update, or delete rows in the `user` table.
+
 ## 2. Token Entity
 
 ### 2.1 Schema
@@ -13,7 +15,7 @@ Table name: `token`
 | Column       | Type         | Constraints       | Description                     |
 | ------------ | ------------ | ----------------- | ------------------------------- |
 | `id`         | VARCHAR(32)  | PRIMARY KEY       | Token string (the bearer token) |
-| `uid`        | INT UNSIGNED | UNIQUE, NOT NULL  | Associated user ID              |
+| `uid`        | INT UNSIGNED | UNIQUE, NOT NULL  | Associated registered user ID   |
 | `role`       | INT UNSIGNED | NOT NULL          | User role identifier            |
 | `created_at` | DATETIME     | NOT NULL, DEFAULT | Token creation timestamp        |
 
@@ -53,11 +55,13 @@ function authorization(ctx, next):
     await next()
 ```
 
-## 4. User Entity
+## 4. Article Display User Entity
 
 ### 4.1 Schema
 
 Table name: `user`
+
+This table is used for article and paste author display only. It is populated from Luogu content data during save tasks. Authentication code SHALL NOT write to this table.
 
 | Column       | Type         | Constraints | Description                       |
 | ------------ | ------------ | ----------- | --------------------------------- |
@@ -97,22 +101,40 @@ The `UserService.upsertLuoguUser(data)` method SHALL:
 5. Execute as one database upsert operation so concurrent saves for the same user do not fail with a duplicate primary-key error.
 6. After a successful upsert, evict Redis cache key `user:{data.id}`.
 
-### 4.5 CP OAuth User Upsert
+## 5. Registered User Entity
 
-The `UserService.upsertCpOAuthUser(data)` method SHALL:
+Table name: `registered_user`
 
-1. Require `data.id` to be a positive integer Luogu user ID.
-2. Use `data.id` as the unique user key.
-3. Use `data.name` as the user display name.
-4. Use `UserColor.GRAY` as the user color when CP OAuth does not provide a Luogu color.
-5. Insert a user row when no row exists for `data.id`.
-6. Update the existing row when a row exists for `data.id`.
-7. Execute as one database upsert operation so concurrent saves for the same user do not fail with a duplicate primary-key error.
-8. After a successful upsert, evict Redis cache key `user:{data.id}`.
+This table stores users that can log in to Luogu Saver Next.
 
-## 5. CP OAuth Login
+| Column         | Type         | Constraints      | Description                |
+| -------------- | ------------ | ---------------- | -------------------------- |
+| `id`           | INT UNSIGNED | PRIMARY KEY      | Local registered user ID   |
+| `cp_oauth_sub` | VARCHAR(128) | UNIQUE, NOT NULL | CP OAuth subject claim     |
+| `luogu_uid`    | INT UNSIGNED | UNIQUE, NOT NULL | Linked Luogu user ID       |
+| `name`         | VARCHAR      | NOT NULL         | Display name from CP OAuth |
+| `avatar_url`   | VARCHAR      | NULL             | Avatar URL from CP OAuth   |
+| `created_at`   | DATETIME     | NOT NULL         | Record creation timestamp  |
+| `updated_at`   | DATETIME     | NOT NULL         | Record update timestamp    |
 
-### 5.1 Configuration
+### 5.1 CP OAuth Registered User Upsert
+
+The `RegisteredUserService.upsertCpOAuthUser(data)` method SHALL:
+
+1. Require `data.cpOAuthSub` to be a non-empty string.
+2. Require `data.luoguUid` to be a positive integer.
+3. Use `data.cpOAuthSub` as the upsert conflict key.
+4. Store `data.luoguUid` in `registered_user.luogu_uid`.
+5. Store `data.name` as the display name. If `data.name` is empty, store `User {luoguUid}`.
+6. Store `data.avatarUrl` when it is present. Store `NULL` when it is absent.
+7. Insert a registered user row when no row exists for `data.cpOAuthSub`.
+8. Update the existing registered user row when a row exists for `data.cpOAuthSub`.
+9. Return the row after the upsert.
+10. Not read or write the `user` table.
+
+## 6. CP OAuth Login
+
+### 6.1 Configuration
 
 The `auth.cpOAuth` configuration object SHALL contain:
 
@@ -126,7 +148,7 @@ The `auth.cpOAuth` configuration object SHALL contain:
 | `scopes`              | string[] | `['openid', 'profile', 'link:luogu']`                      | Scopes requested from CP OAuth                  |
 | `stateExpireSeconds`  | number   | 600                                                        | Redis TTL for OAuth state and PKCE verifier     |
 
-### 5.2 GET /auth/cp/login
+### 6.2 GET /auth/cp/login
 
 Start the CP OAuth authorization code flow.
 
@@ -152,7 +174,7 @@ Start the CP OAuth authorization code flow.
     - `code_challenge=code_challenge`
     - `code_challenge_method=S256`
 
-### 5.3 GET /auth/cp/callback
+### 6.3 GET /auth/cp/callback
 
 Complete the CP OAuth authorization code flow.
 
@@ -178,47 +200,54 @@ Complete the CP OAuth authorization code flow.
     - `client_secret=auth.cpOAuth.clientSecret` only when non-empty
 7. Require a string `access_token` in the token response.
 8. Fetch the discovered `userinfo_endpoint` with header `Authorization: Bearer {access_token}`.
-9. Require `linked_accounts` to contain an object with `platform='luogu'` and numeric `platformUid`.
-10. Upsert a local user using:
-    - `id = Number(platformUid)`
-    - `name = platformUsername` when present, otherwise `display_name`, otherwise `username`, otherwise `User {id}`
-11. Find an existing local token by `uid`.
-12. If no token exists, create a new 32-character hex token with role `ROLE_DEFAULT`.
-13. Redirect to `frontendRedirectUri` with query parameters:
+9. Require a non-empty string `sub` in the userinfo response.
+10. Require `linked_accounts` to contain an object with `platform='luogu'` and numeric `platformUid`.
+11. Upsert a registered user using:
+    - `cpOAuthSub = sub`
+    - `luoguUid = Number(platformUid)`
+    - `name = platformUsername` when present, otherwise `display_name`, otherwise `username`, otherwise `User {luoguUid}`
+    - `avatarUrl = avatar_url` when present
+12. The callback SHALL NOT write to the `user` table.
+13. Find an existing local token where `uid` equals `registered_user.id`.
+14. If no token exists, create a new 32-character hex token with `uid=registered_user.id` and `role=ROLE_DEFAULT`.
+15. Redirect to `frontendRedirectUri` with query parameters:
     - `token=local token`
-    - `uid=local user ID`
+    - `uid=registered user ID`
     - `role=local role`
     - `redirect=stored redirect`
 
-### 5.4 GET /auth/me
+### 6.4 GET /auth/me
 
 Return the authenticated local user.
 
 **Response:**
 
-- 200: `{ uid, role, user }` when `ctx.user` exists.
+- 200: `{ uid, role, registeredUser }` when `ctx.user` exists.
 - 401: `Unauthorized` when `ctx.user` does not exist.
 
-## 6. Authorization States
+## 7. Authorization States
 
 | `ctx.user`   | Interpretation                      |
 | ------------ | ----------------------------------- |
 | `undefined`  | Unauthenticated request             |
 | `{id, role}` | Authenticated user with ID and role |
 
-## 7. Security Constraints
+## 8. Security Constraints
 
 1. Tokens are stored as plaintext in the database.
 2. Token validation is performed on every request with an Authorization header.
 3. The middleware does NOT reject unauthenticated requests; downstream handlers must check `ctx.user` if authentication is required.
 4. CP OAuth state values are single-use because the callback deletes the Redis state key before token exchange.
 5. CP OAuth login SHALL NOT accept a CP OAuth user without a linked Luogu account.
+6. CP OAuth login SHALL NOT mutate the article display `user` table.
 
-## 8. File Locations
+## 9. File Locations
 
 - Token entity: `packages/backend/src/entities/token.ts`
 - User entity: `packages/backend/src/entities/user.ts`
+- Registered user entity: `packages/backend/src/entities/registered-user.ts`
 - Authorization middleware: `packages/backend/src/middlewares/authorization.ts`
 - User color enum: `packages/backend/src/shared/user.ts`
+- Registered user service: `packages/backend/src/services/registered-user.service.ts`
 - CP OAuth service: `packages/backend/src/services/auth.service.ts`
 - Auth router: `packages/backend/src/routers/auth.router.ts`

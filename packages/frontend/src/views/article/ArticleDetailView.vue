@@ -242,7 +242,7 @@ onMounted(() => {
 
 <template>
     <n-spin :show="isSaving" description="正在保存并处理..." class="saving-spin">
-        <n-grid :x-gap="16" cols="1 l:8" responsive="screen">
+        <n-grid class="article-layout" :x-gap="20" cols="1 l:12" responsive="screen">
             <n-gi :span="1" class="sidebar-left">
                 <SidebarWidget
                     v-if="tocItems.length > 0"
@@ -265,7 +265,7 @@ onMounted(() => {
                 </SidebarWidget>
             </n-gi>
 
-            <n-gi :span="6" class="main-content">
+            <n-gi :span="8" class="main-content">
                 <LoadingSkeleton :loading="loading">
                     <template #skeleton>
                         <Card>
@@ -484,7 +484,6 @@ onMounted(() => {
                                                         borderColor: getCategoryColor(it.category)
                                                     }"
                                                     size="small"
-                                                    style="margin-left: 8px"
                                                 >
                                                     <template #icon>
                                                         <n-icon
@@ -515,7 +514,7 @@ onMounted(() => {
                 </div>
             </n-gi>
 
-            <n-gi v-if="versionHistory.length > 0" :span="1" class="sidebar-right">
+            <n-gi v-if="versionHistory.length > 0" :span="3" class="sidebar-right">
                 <SidebarWidget title="历史版本" :icon="TimeOutline" class="version-card">
                     <n-timeline>
                         <n-timeline-item
@@ -549,6 +548,15 @@ onMounted(() => {
     display: block;
 }
 
+.article-layout {
+    max-width: 1380px;
+    margin: 0 auto;
+}
+
+.main-content {
+    min-width: 0;
+}
+
 .toc-card,
 .version-card {
     position: sticky;
@@ -562,9 +570,10 @@ onMounted(() => {
 }
 
 .info-item {
-    background: #f9fafb;
-    padding: 8px 12px;
-    border-radius: 4px;
+    background: linear-gradient(180deg, #f8fbff, #f3f8ff);
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(22, 119, 255, 0.08);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -594,7 +603,7 @@ onMounted(() => {
     cursor: pointer;
 }
 .article-summary {
-    color: #555;
+    color: #475569;
     font-size: 14px;
     line-height: 1.6;
     margin-bottom: 8px;
@@ -608,6 +617,8 @@ onMounted(() => {
 .article-meta .left {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .update-floater {

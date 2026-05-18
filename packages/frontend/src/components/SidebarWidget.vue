@@ -29,6 +29,12 @@ const iconColor = computed(() => themeVars.value.primaryColor);
 <style scoped>
 .sidebar-widget {
     margin-bottom: 24px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(22, 119, 255, 0.1);
+    box-shadow: 0 14px 32px rgba(22, 119, 255, 0.08);
+    backdrop-filter: blur(14px);
 }
 
 .widget-header {
@@ -37,7 +43,7 @@ const iconColor = computed(() => themeVars.value.primaryColor);
     gap: 8px;
     margin-bottom: 16px;
     padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid rgba(22, 119, 255, 0.1);
 }
 
 .widget-icon {
@@ -51,6 +57,6 @@ const iconColor = computed(() => themeVars.value.primaryColor);
 }
 
 .widget-content {
-    padding: 0 4px;
+    padding: 0 2px;
 }
 </style>

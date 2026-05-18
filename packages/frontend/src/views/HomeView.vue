@@ -35,9 +35,9 @@ const handleSave = () => {
         <HomeHero />
 
         <div class="main-content">
-            <n-grid :x-gap="24" :y-gap="24" cols="1 m:2 l:3" responsive="screen">
+            <n-grid :x-gap="20" :y-gap="20" cols="1 m:2 l:3" responsive="screen">
                 <n-gi span="1 m:1 l:2">
-                    <Card title="公告" style="height: calc(100% - 48px)">
+                    <Card title="公告" class="home-card">
                         <template #header-extra>
                             <n-icon
                                 size="20"
@@ -50,7 +50,7 @@ const handleSave = () => {
                 </n-gi>
 
                 <n-gi>
-                    <Card style="height: calc(100% - 48px)">
+                    <Card class="home-card stat-card">
                         <div class="stats-container">
                             <div class="stat-item">
                                 <div
@@ -97,13 +97,17 @@ const handleSave = () => {
 .home-container {
     display: flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 22px;
 }
 
 .main-content {
-    max-width: 1200px;
+    max-width: 1220px;
     margin: 0 auto;
     width: 100%;
+}
+
+.home-card {
+    min-height: 190px;
 }
 
 .stat-item {
@@ -116,7 +120,7 @@ const handleSave = () => {
 .stat-icon-wrapper {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -124,8 +128,9 @@ const handleSave = () => {
 
 .announcement-content {
     font-size: 16px;
-    line-height: 1.6;
-    color: #444;
+    line-height: 1.8;
+    color: #475569;
+    padding: 6px 0 0;
 }
 
 .stats-container {
@@ -133,5 +138,10 @@ const handleSave = () => {
     display: flex;
     flex-direction: column;
     justify-content: space-around;
+}
+
+.stat-card :deep(.n-statistic-value__content) {
+    color: #10233f;
+    font-weight: 700;
 }
 </style>

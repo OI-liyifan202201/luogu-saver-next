@@ -1,13 +1,13 @@
 import { type UiThemeVars } from '@/styles/theme/themeKeys.ts';
 
 export const defaultTheme: UiThemeVars = {
-    bodyColor: '#f8fafc',
-    primaryColor: '#18a058',
-    primaryColorHover: '#36ad6a',
-    primaryColorPressed: '#0c7a43',
-    primaryColorSuppl: '#36ad6a',
+    bodyColor: '#f6f9fd',
+    primaryColor: '#2f6db5',
+    primaryColorHover: '#4b83c2',
+    primaryColorPressed: '#1f4f8f',
+    primaryColorSuppl: '#8ab7dd',
     cardColor: '#ffffff',
-    cardTitleColor: '#333639',
-    cardShadow: '2px 2px 4px #e4e4e4',
-    iconColor: '#18a058'
+    cardTitleColor: '#10233f',
+    cardShadow: '0 14px 36px rgba(47, 109, 181, 0.08)',
+    iconColor: '#2f6db5'
 };

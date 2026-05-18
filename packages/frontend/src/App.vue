@@ -5,6 +5,7 @@
             <n-space vertical>
                 <n-layout has-sider>
                     <n-layout-sider
+                        class="app-sider"
                         bordered
                         show-trigger="bar"
                         :collapsed="collapsed"
@@ -16,14 +17,7 @@
                         @mouseenter="handleMouseEnter"
                         @mouseleave="handleMouseLeave"
                     >
-                        <div
-                            style="
-                                height: 64px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            "
-                        >
+                        <div class="brand-shell">
                             <img
                                 v-if="!collapsed"
                                 src="/logo-text.png"
@@ -50,18 +44,15 @@
                     </n-layout-sider>
 
                     <n-dialog-provider>
-                        <n-layout :native-scrollbar="false">
-                            <n-layout-content content-style="padding: 24px;">
+                        <n-layout class="app-main" :native-scrollbar="false">
+                            <n-layout-content content-style="padding: 28px;">
                                 <div class="router-view">
                                     <n-back-top :right="50" />
                                     <router-view />
                                 </div>
 
                                 <IconConfigProvider size="14">
-                                    <n-layout-footer
-                                        bordered
-                                        style="margin-top: 24px; padding: 10px 40px"
-                                    >
+                                    <n-layout-footer bordered class="app-footer">
                                         <n-grid cols="2">
                                             <n-gi>
                                                 <p class="footer-element">
@@ -392,6 +383,18 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
             primaryColorPressed: uiThemeVars.value.primaryColorPressed,
             primaryColorSuppl: uiThemeVars.value.primaryColorSuppl,
             cardColor: uiThemeVars.value.cardColor
+        },
+        Layout: {
+            color: uiThemeVars.value.bodyColor,
+            siderColor: 'rgba(255, 255, 255, 0.78)'
+        },
+        Menu: {
+            itemTextColorActive: uiThemeVars.value.primaryColor,
+            itemIconColorActive: uiThemeVars.value.primaryColor,
+            itemColorActive: 'rgba(22, 119, 255, 0.1)',
+            itemColorActiveHover: 'rgba(22, 119, 255, 0.14)',
+            itemColorHover: 'rgba(22, 119, 255, 0.08)',
+            borderRadius: '12px'
         }
     };
 });
@@ -415,6 +418,36 @@ setInterval(() => {
 .n-layout {
     height: 100vh;
 }
+
+.app-main {
+    background:
+        radial-gradient(circle at top left, rgba(22, 119, 255, 0.12), transparent 34vw),
+        linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+}
+
+.app-sider {
+    border-right: 1px solid rgba(22, 119, 255, 0.1) !important;
+    backdrop-filter: blur(18px);
+    box-shadow: 12px 0 32px rgba(15, 70, 130, 0.06);
+}
+
+.brand-shell {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid rgba(22, 119, 255, 0.08);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(233, 245, 255, 0.52));
+}
+
+.app-footer {
+    margin-top: 28px;
+    padding: 14px 40px;
+    border-radius: 18px 18px 0 0;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px);
+}
+
 .footer-element {
     display: flex;
     align-items: center;
@@ -444,8 +477,18 @@ setInterval(() => {
     margin-left: 16px;
 }
 .router-view {
-    max-width: 1400px;
+    max-width: 1440px;
     margin: 0 auto;
     min-height: calc(100vh - 48px);
+}
+
+@media (max-width: 768px) {
+    :deep(.n-layout-content) {
+        padding: 16px !important;
+    }
+
+    .app-footer {
+        padding: 12px 16px;
+    }
 }
 </style>
