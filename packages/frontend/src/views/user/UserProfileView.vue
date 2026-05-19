@@ -1,0 +1,527 @@
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import {
+    NAvatar,
+    NSpin,
+    NEmpty,
+    NTag,
+    NTime,
+    NSpace,
+    NButton,
+    NIcon,
+    NTooltip,
+    useMessage
+} from 'naive-ui';
+import { SyncOutline, TrophyOutline, ReaderOutline, PersonCircleOutline } from '@vicons/ionicons5';
+
+import { getUserProfile, refreshUserProfile } from '@/api/user';
+import socket from '@/utils/websocket';
+import type { UserProfile } from '@/types/user';
+
+import Card from '@/components/Card.vue';
+import MarkdownViewer from '@/components/MarkdownViewer.vue';
+import UserPrizeBadge from '@/components/UserPrizeBadge.vue';
+
+const route = useRoute();
+const message = useMessage();
+
+const loading = ref(true);
+const notFound = ref(false);
+const profile = ref<UserProfile | null>(null);
+const refreshing = ref(false);
+
+const uid = computed(() => {
+    const raw = route.params.id;
+    if (typeof raw !== 'string') return null;
+    if (!/^[1-9]\d*$/.test(raw)) return null;
+    return Number(raw);
+});
+
+const colorClass = computed(() => `user-${profile.value?.color || 'Gray'}`);
+
+// Award level → tag type mapping. The strings are free-form from Luogu, so we use
+// substring matching on the user-visible terms.
+function prizeTagType(prize: string): 'success' | 'warning' | 'error' | 'info' | 'default' {
+    if (prize.includes('金')) return 'warning';
+    if (prize.includes('银')) return 'default';
+    if (prize.includes('铜')) return 'error';
+    if (prize.includes('一等')) return 'warning';
+    if (prize.includes('二等')) return 'default';
+    if (prize.includes('三等')) return 'error';
+    return 'info';
+}
+
+// Prizes are pre-sorted by Luogu in chronological order. Reverse for display so the
+// most recent contest appears at the top.
+const orderedPrizes = computed(() => {
+    if (!profile.value?.prizes) return [];
+    return [...profile.value.prizes].reverse();
+});
+
+const room = computed(() => (uid.value !== null ? `user_${uid.value}` : null));
+const event = computed(() => (uid.value !== null ? `user:${uid.value}:profile-updated` : null));
+
+let listenerAttached = false;
+
+function onProfileUpdated() {
+    if (uid.value === null) return;
+    void reload(/* silent */ true);
+}
+
+function attachSocket() {
+    if (listenerAttached || !room.value || !event.value) return;
+    socket.joinRoom(room.value);
+    socket.getInstance().on(event.value, onProfileUpdated);
+    listenerAttached = true;
+}
+
+function detachSocket() {
+    if (!listenerAttached || !room.value || !event.value) return;
+    socket.getInstance().off(event.value, onProfileUpdated);
+    socket.leaveRoom(room.value);
+    listenerAttached = false;
+}
+
+async function reload(silent = false) {
+    if (uid.value === null) return;
+    if (!silent) loading.value = true;
+    notFound.value = false;
+    try {
+        const res = await getUserProfile(uid.value);
+        if (res.code !== 200 || !res.data) {
+            notFound.value = true;
+            profile.value = null;
+        } else {
+            profile.value = res.data;
+        }
+    } catch (e: any) {
+        const status = e?.response?.status;
+        if (status === 404) {
+            notFound.value = true;
+            profile.value = null;
+        } else {
+            message.error(e?.message || '加载用户信息失败');
+        }
+    } finally {
+        if (!silent) loading.value = false;
+    }
+}
+
+async function handleManualRefresh() {
+    if (uid.value === null || refreshing.value) return;
+    refreshing.value = true;
+    try {
+        await refreshUserProfile(uid.value);
+        message.info('已请求刷新,稍后将自动更新');
+    } catch (e: any) {
+        message.error(e?.message || '刷新失败');
+    } finally {
+        refreshing.value = false;
+    }
+}
+
+watch(uid, async () => {
+    detachSocket();
+    profile.value = null;
+    if (uid.value === null) {
+        notFound.value = true;
+        loading.value = false;
+        return;
+    }
+    await reload();
+    attachSocket();
+});
+
+onMounted(async () => {
+    if (uid.value === null) {
+        notFound.value = true;
+        loading.value = false;
+        return;
+    }
+    await reload();
+    attachSocket();
+});
+
+onUnmounted(() => {
+    detachSocket();
+});
+</script>
+
+<template>
+    <div class="user-profile-view">
+        <n-spin :show="loading">
+            <Card v-if="!loading && notFound">
+                <n-empty description="未找到该用户" />
+            </Card>
+
+            <div v-else-if="profile" class="profile-grid">
+                <!-- LEFT COLUMN: introduction (Markdown) -->
+                <div class="profile-left">
+                    <Card class="profile-card profile-card--intro">
+                        <template #title>
+                            <n-space align="center" :size="8">
+                                <n-icon size="20"><ReaderOutline /></n-icon>
+                                <span>个人介绍</span>
+                            </n-space>
+                        </template>
+
+                        <MarkdownViewer
+                            v-if="profile.renderedIntroduction"
+                            :content="profile.renderedIntroduction"
+                        />
+                        <n-empty v-else description="该用户暂无个人介绍" />
+                    </Card>
+                </div>
+
+                <!-- RIGHT COLUMN: identity card + compact prizes list -->
+                <div class="profile-right">
+                    <Card class="profile-card profile-card--identity">
+                        <template #title>
+                            <n-space align="center" :size="8">
+                                <n-icon size="20"><PersonCircleOutline /></n-icon>
+                                <span>个人信息</span>
+                            </n-space>
+                        </template>
+
+                        <div class="identity-header">
+                            <n-avatar
+                                round
+                                :size="56"
+                                :src="`https://cdn.luogu.com.cn/upload/usericon/${profile.id}.png`"
+                            />
+                            <div class="identity-name-block">
+                                <div class="identity-name-row">
+                                    <span class="identity-name user-name" :class="colorClass">
+                                        {{ profile.name }}
+                                    </span>
+                                    <UserPrizeBadge
+                                        v-if="profile.ccfLevel > 0 || profile.xcpcLevel > 0"
+                                        :ccf-level="profile.ccfLevel"
+                                        :xcpc-level="profile.xcpcLevel"
+                                        :size="16"
+                                    />
+                                </div>
+                                <div v-if="profile.slogan" class="identity-slogan">
+                                    {{ profile.slogan }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <dl class="identity-fields">
+                            <div class="identity-field">
+                                <dt>UID</dt>
+                                <dd>{{ profile.id }}</dd>
+                            </div>
+                            <div v-if="profile.ccfLevel > 0" class="identity-field">
+                                <dt>OI 等级</dt>
+                                <dd>{{ profile.ccfLevel }} 级</dd>
+                            </div>
+                            <div v-if="profile.xcpcLevel > 0" class="identity-field">
+                                <dt>ICPC/CCPC 等级</dt>
+                                <dd>{{ profile.xcpcLevel }} 级</dd>
+                            </div>
+                            <div class="identity-field identity-field--faint">
+                                <dt>更新于</dt>
+                                <dd>
+                                    <template v-if="profile.profileFetchedAt">
+                                        <n-time
+                                            :time="new Date(profile.profileFetchedAt)"
+                                            type="relative"
+                                        />
+                                    </template>
+                                    <template v-else>尚未拉取完整资料</template>
+                                </dd>
+                            </div>
+                        </dl>
+
+                        <div class="identity-actions">
+                            <n-button
+                                size="small"
+                                secondary
+                                :loading="refreshing"
+                                @click="handleManualRefresh"
+                            >
+                                <template #icon>
+                                    <n-icon><SyncOutline /></n-icon>
+                                </template>
+                                刷新
+                            </n-button>
+                            <span v-if="profile.profileStale" class="identity-stale">
+                                后台刷新中
+                            </span>
+                        </div>
+                    </Card>
+
+                    <Card class="profile-card profile-card--prizes">
+                        <template #title>
+                            <n-space align="center" :size="8">
+                                <n-icon size="20"><TrophyOutline /></n-icon>
+                                <span>获奖信息</span>
+                            </n-space>
+                        </template>
+
+                        <n-empty
+                            v-if="orderedPrizes.length === 0"
+                            :description="
+                                profile.profileFetchedAt
+                                    ? '该用户暂无可见的获奖记录'
+                                    : '正在拉取数据,请稍候...'
+                            "
+                        />
+
+                        <ul v-else class="prize-list-compact">
+                            <li v-for="(prize, idx) in orderedPrizes" :key="idx" class="prize-row">
+                                <n-tooltip
+                                    v-if="prize.score != null || prize.rank != null"
+                                    :delay="200"
+                                >
+                                    <template #trigger>
+                                        <div class="prize-row-text">
+                                            <span class="prize-row-year">[{{ prize.year }}]</span>
+                                            <span class="prize-row-contest">
+                                                {{ prize.contest }}
+                                            </span>
+                                            <span v-if="prize.event" class="prize-row-event">
+                                                · {{ prize.event }}
+                                            </span>
+                                        </div>
+                                    </template>
+                                    <div class="prize-tooltip">
+                                        <div v-if="prize.score != null">
+                                            成绩: {{ prize.score }}
+                                        </div>
+                                        <div v-if="prize.rank != null">排名: {{ prize.rank }}</div>
+                                    </div>
+                                </n-tooltip>
+                                <div v-else class="prize-row-text">
+                                    <span class="prize-row-year">[{{ prize.year }}]</span>
+                                    <span class="prize-row-contest">{{ prize.contest }}</span>
+                                    <span v-if="prize.event" class="prize-row-event">
+                                        · {{ prize.event }}
+                                    </span>
+                                </div>
+                                <n-tag
+                                    size="small"
+                                    :type="prizeTagType(prize.prize)"
+                                    :bordered="false"
+                                >
+                                    {{ prize.prize }}
+                                </n-tag>
+                            </li>
+                        </ul>
+                    </Card>
+                </div>
+            </div>
+        </n-spin>
+    </div>
+</template>
+
+<style scoped>
+.user-profile-view {
+    max-width: 1200px;
+    margin: 0 auto;
+    min-width: 0;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 16px;
+    align-items: start;
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.profile-left,
+.profile-right {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* prevent any oversized child from overflowing the grid cell */
+    overflow: hidden;
+}
+
+.profile-card {
+    width: 100%;
+    box-sizing: border-box;
+    /* belt-and-suspenders: even if a child has fixed width, clip it */
+    overflow: hidden;
+}
+.profile-card :deep(*) {
+    box-sizing: border-box;
+}
+
+/* Constrain Markdown content that would otherwise blow up the grid */
+.profile-card--intro :deep(img),
+.profile-card--intro :deep(video) {
+    max-width: 100%;
+    height: auto;
+}
+.profile-card--intro :deep(pre) {
+    max-width: 100%;
+    overflow-x: auto;
+}
+.profile-card--intro :deep(.table-container),
+.profile-card--intro :deep(table) {
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+}
+.profile-card--intro :deep(iframe) {
+    max-width: 100%;
+}
+
+/* Identity card */
+.identity-header {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 14px;
+    min-width: 0;
+}
+.identity-name-block {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.identity-name-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.identity-name {
+    font-size: 18px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.identity-slogan {
+    margin-top: 4px;
+    color: var(--n-text-color-2, #666);
+    font-size: 13px;
+    line-height: 1.4;
+    font-style: italic;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    /* break long English/URLs so flex children don't blow out the column */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.identity-fields {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.identity-field {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--n-divider-color, #eee);
+    min-width: 0;
+}
+.identity-field:last-child {
+    border-bottom: none;
+}
+.identity-field dt {
+    margin: 0;
+    flex-shrink: 0;
+    color: var(--n-text-color-2, #666);
+    font-size: 13px;
+    white-space: nowrap;
+}
+.identity-field dd {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--n-text-color-1, #333);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.identity-field--faint dd {
+    font-weight: 400;
+    color: var(--n-text-color-3, #999);
+    font-size: 12px;
+}
+
+.identity-actions {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.identity-stale {
+    font-size: 12px;
+    color: var(--n-text-color-3, #999);
+}
+
+/* Compact prize list */
+.prize-list-compact {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+.prize-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--n-divider-color, #eee);
+}
+.prize-row:last-child {
+    border-bottom: none;
+}
+.prize-row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.prize-row-year {
+    color: var(--n-text-color-3, #999);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+.prize-row-contest {
+    color: var(--n-text-color-1, #333);
+    font-weight: 500;
+}
+.prize-row-event {
+    color: var(--n-text-color-3, #999);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.prize-tooltip {
+    font-size: 12px;
+    line-height: 1.6;
+}
+</style>
