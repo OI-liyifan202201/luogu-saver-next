@@ -77,11 +77,23 @@ async function getProcessor() {
 
         function remarkCustomContainers() {
             return (tree: any) => {
+                const extractDirectiveLabel = (node: any) => {
+                    const labelNode = node.children?.[0];
+                    if (!labelNode?.data?.directiveLabel) return '';
+                    const label = labelNode.children
+                        ?.map((child: any) => child.value || '')
+                        .join('')
+                        .trim();
+                    node.children = node.children.slice(1);
+                    return label || '';
+                };
+
                 visit(tree, node => {
                     if (node.type === 'containerDirective') {
                         const data = node.data || (node.data = {});
                         const attributes = node.attributes || {};
                         const name = node.name;
+                        const label = extractDirectiveLabel(node);
 
                         if (name === 'align') {
                             const align =
@@ -96,7 +108,7 @@ async function getProcessor() {
                                 'data-author': author
                             };
                         } else if (['info', 'warning', 'success', 'error'].includes(name)) {
-                            const title = attributes.title || name.toUpperCase();
+                            const title = attributes.title || label || name.toUpperCase();
                             const open = attributes.open !== undefined;
                             data.hName = 'div';
                             data.hProperties = {
