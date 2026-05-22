@@ -1,18 +1,19 @@
 import { TaskDefinition, WorkflowDefinition } from '@/utils/flow-validator';
 import { Permission } from '@/shared/permission';
+import { clampInt } from '@/utils/number';
 
 export type WorkflowTemplateBuilder = (params: any) => WorkflowDefinition;
 
 const normalizeReindexBatchSize = (value: any) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return 100;
-    return Math.min(500, Math.max(1, Math.floor(parsed)));
+    return clampInt(value, 100, 1, 500);
 };
 
 const normalizeSummaryRebuildBatchSize = (value: any) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return 20;
-    return Math.min(100, Math.max(1, Math.floor(parsed)));
+    return clampInt(value, 20, 1, 100);
+};
+
+const normalizeSummaryRebuildConcurrency = (value: any) => {
+    return clampInt(value, 5, 1, 20);
 };
 
 export const WORKFLOW_TEMPLATES_PERMISSION: { [key: string]: Permission | null } = {
@@ -189,10 +190,10 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
         const query = String(params?.query || '').trim();
         if (!query) throw new Error('query is required for rag-search-pipeline');
 
-        const limit = Math.min(20, Math.max(1, Number(params?.limit) || 10));
+        const limit = clampInt(params?.limit, 10, 1, 20);
         const maxQueries = 5;
-        const maxArticles = Math.min(10, Math.max(1, Number(params?.maxArticles) || 10));
-        const maxChars = Math.min(20000, Math.max(1000, Number(params?.maxChars) || 20000));
+        const maxArticles = clampInt(params?.maxArticles, 10, 1, 10);
+        const maxChars = clampInt(params?.maxChars, 20000, 1000, 20000);
 
         const tasks: TaskDefinition[] = [
             {
@@ -300,6 +301,7 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
     },
     'article-summary-rebuild-pipeline': (params: any) => {
         const batchSize = normalizeSummaryRebuildBatchSize(params?.batchSize);
+        const concurrency = normalizeSummaryRebuildConcurrency(params?.concurrency);
         const tasks: TaskDefinition[] = [
             {
                 name: 'rebuild-summary',
@@ -310,7 +312,7 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
                     payload: {
                         target: 'article_summary_rebuild',
                         targetId: 'articles',
-                        metadata: { batchSize }
+                        metadata: { batchSize, concurrency }
                     }
                 }
             }

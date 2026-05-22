@@ -4,15 +4,15 @@ import { ArticleService } from '@/services/article.service';
 import { SearchService } from '@/services/search.service';
 import { generateArticleSummary } from '@/workers/handlers/task/llm/summary.handler';
 import { logger } from '@/lib/logger';
+import { runWithConcurrency } from '@/utils/concurrency';
+import { clampInt } from '@/utils/number';
 
 export class UpdateArticleSummaryRebuildHandler implements TaskHandler<UpdateTask> {
     public taskType = 'update:article_summary_rebuild';
 
     public async handle(task: UpdateTask): Promise<WorkflowResult<TaskCommonResult>> {
-        const batchSize = Math.min(
-            100,
-            Math.max(1, Math.floor(Number(task.payload.metadata?.batchSize) || 20))
-        );
+        const batchSize = clampInt(task.payload.metadata?.batchSize, 20, 1, 100);
+        const concurrency = clampInt(task.payload.metadata?.concurrency, 5, 1, 20);
         const failedArticleIds: string[] = [];
         let processed = 0;
         let updated = 0;
@@ -21,9 +21,9 @@ export class UpdateArticleSummaryRebuildHandler implements TaskHandler<UpdateTas
         while (true) {
             const articles = await ArticleService.getArticlesForSummaryRebuild(afterId, batchSize);
             if (articles.length === 0) break;
+            afterId = articles[articles.length - 1].id;
 
-            for (const article of articles) {
-                afterId = article.id;
+            await runWithConcurrency(articles, concurrency, async article => {
                 processed += 1;
                 try {
                     article.summary = await generateArticleSummary(article.content);
@@ -37,7 +37,7 @@ export class UpdateArticleSummaryRebuildHandler implements TaskHandler<UpdateTas
                         'Failed to rebuild article summary'
                     );
                 }
-            }
+            });
         }
 
         return {

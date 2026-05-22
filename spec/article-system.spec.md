@@ -205,11 +205,12 @@ When saving an article:
 
 The workflow template `article-summary-rebuild-pipeline` SHALL rebuild summaries for all non-deleted articles.
 
-Input parameter:
+Input parameters:
 
-| Parameter   | Type   | Required | Default | Constraint            |
-| ----------- | ------ | -------- | ------- | --------------------- |
-| `batchSize` | number | no       | 20      | Integer in `[1, 100]` |
+| Parameter     | Type   | Required | Default | Constraint            |
+| ------------- | ------ | -------- | ------- | --------------------- |
+| `batchSize`   | number | no       | 20      | Integer in `[1, 100]` |
+| `concurrency` | number | no       | 5       | Integer in `[1, 20]`  |
 
 Task `rebuild-summary` SHALL:
 
@@ -217,14 +218,15 @@ Task `rebuild-summary` SHALL:
 2. Have target `article_summary_rebuild`.
 3. Have `targetId='articles'`.
 4. Have `metadata.batchSize` equal to normalized `batchSize`.
-5. Set `track=true`.
-6. Set `report=true`.
-7. Require permission `MANAGE_SEARCH`.
+5. Have `metadata.concurrency` equal to normalized `concurrency`.
+6. Set `track=true`.
+7. Set `report=true`.
+8. Require permission `MANAGE_SEARCH`.
 
 The update handler for `article_summary_rebuild` SHALL:
 
 1. Load non-deleted articles from the database in ascending `id` order.
-2. Process articles sequentially.
+2. Process each loaded batch with at most `metadata.concurrency` articles running at the same time.
 3. For each article, call the summary LLM scenario with the same summary prompt semantics as `llm:summary`.
 4. Persist the generated summary to `article.summary`.
 5. After persisting a summary, update the search index document for that article if search indexing is enabled.

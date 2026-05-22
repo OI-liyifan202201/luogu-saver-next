@@ -36,9 +36,9 @@ export async function reindexSearch(batchSize: number = 100) {
     })) as ApiResponse<CreateWorkflowTemplateResponse>;
 }
 
-export async function rebuildArticleSummaries(batchSize: number = 20) {
+export async function rebuildArticleSummaries(batchSize: number = 20, concurrency: number = 5) {
     return (await apiFetch('/admin/articles/summary/rebuild', {
         method: 'POST',
-        data: { batchSize }
+        data: { batchSize, concurrency }
     })) as ApiResponse<CreateWorkflowTemplateResponse>;
 }

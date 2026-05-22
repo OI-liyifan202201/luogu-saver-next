@@ -3,6 +3,7 @@ import { SearchTask } from '@/shared/task';
 import { ChildrenValues, TaskCommonResult, TaskHandler, WorkflowResult } from '@/workers/types';
 import { extractUpsteamData, shouldSkip } from '@/workers/helpers/common.helper';
 import { SearchService } from '@/services/search.service';
+import { clampInt } from '@/utils/number';
 
 export class ArticleSearchHandler implements TaskHandler<SearchTask> {
     public taskType = 'search:article';
@@ -26,7 +27,7 @@ export class ArticleSearchHandler implements TaskHandler<SearchTask> {
             job.id
         )?.text;
         const query = task.payload.query || upstreamText || '';
-        const limit = Math.min(20, Math.max(1, Number(task.payload.metadata?.limit) || 5));
+        const limit = clampInt(task.payload.metadata?.limit, 5, 1, 20);
         const result = await SearchService.searchArticles({
             q: query,
             page: 1,

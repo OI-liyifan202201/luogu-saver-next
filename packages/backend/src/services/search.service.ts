@@ -2,6 +2,7 @@ import { config } from '@/config';
 import { Article } from '@/entities/article';
 import { ArticleService } from '@/services/article.service';
 import { logger } from '@/lib/logger';
+import { clampInt } from '@/utils/number';
 
 type DynamicImport = (specifier: string) => Promise<any>;
 type MeilisearchConstructor = new (options: {
@@ -233,8 +234,8 @@ export class SearchService {
     }
 
     static async searchArticles(params: SearchArticlesParams) {
-        const page = Math.max(1, params.page || 1);
-        const limit = Math.min(50, Math.max(1, params.limit || 10));
+        const page = clampInt(params.page, 1, 1, Number.MAX_SAFE_INTEGER);
+        const limit = clampInt(params.limit, 10, 1, 50);
 
         if (!this.enabled) {
             return { hits: [], page, limit, total: 0, processingTimeMs: 0 };

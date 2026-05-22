@@ -2,6 +2,7 @@ import { Job, UnrecoverableError } from 'bullmq';
 import { RagTask } from '@/shared/task';
 import { ChildrenValues, TaskCommonResult, TaskHandler, WorkflowResult } from '@/workers/types';
 import { ArticleService } from '@/services/article.service';
+import { clampInt } from '@/utils/number';
 
 type MergedHit = {
     id: string;
@@ -25,14 +26,8 @@ export class RagContextHandler implements TaskHandler<RagTask> {
         if (!question)
             throw new UnrecoverableError(`No question found for rag context job ${job.id}`);
 
-        const maxArticles = Math.min(
-            10,
-            Math.max(1, Number(task.payload.metadata?.maxArticles) || 6)
-        );
-        const maxChars = Math.min(
-            20000,
-            Math.max(1000, Number(task.payload.metadata?.maxChars) || 8000)
-        );
+        const maxArticles = clampInt(task.payload.metadata?.maxArticles, 10, 1, 10);
+        const maxChars = clampInt(task.payload.metadata?.maxChars, 20000, 1000, 20000);
         const merged = this.mergeHits(childrenValues).slice(0, maxArticles);
         const documents = [];
 

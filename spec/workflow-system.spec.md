@@ -180,17 +180,18 @@ Permission: `MANAGE_SEARCH`.
 
 ### 5.4 `article-summary-rebuild-pipeline`
 
-Input parameter:
+Input parameters:
 
-| Parameter   | Type   | Required | Default | Constraint            |
-| ----------- | ------ | -------- | ------- | --------------------- |
-| `batchSize` | number | no       | 20      | Integer in `[1, 100]` |
+| Parameter     | Type   | Required | Default | Constraint            |
+| ------------- | ------ | -------- | ------- | --------------------- |
+| `batchSize`   | number | no       | 20      | Integer in `[1, 100]` |
+| `concurrency` | number | no       | 5       | Integer in `[1, 20]`  |
 
 Task graph:
 
 1. `rebuild-summary` (tracked, reported)
 
-Task `rebuild-summary` has type `update`, target `article_summary_rebuild`, targetId `articles`, and metadata field `batchSize` equal to the normalized input value.
+Task `rebuild-summary` has type `update`, target `article_summary_rebuild`, targetId `articles`, metadata field `batchSize` equal to the normalized `batchSize`, and metadata field `concurrency` equal to the normalized `concurrency`.
 
 Permission: `MANAGE_SEARCH`.
 

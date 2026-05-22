@@ -20,6 +20,7 @@ import CardTitle from '@/components/CardTitle.vue';
 import Card from '@/components/Card.vue';
 import { searchArticles, type ArticleSearchHit } from '@/api/search.ts';
 import { ARTICLE_CATEGORIES, UNKNOWN_CATEGORY } from '@/utils/constants.ts';
+import { renderSafeMarkedHtml } from '@/utils/render.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -91,18 +92,6 @@ function openArticle(id: string) {
     router.push(`/article/${id}`);
 }
 
-function renderMarkedText(value: string | undefined, fallback: string = '') {
-    const raw = value || fallback;
-    const escaped = raw
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-
-    return escaped.replace(/&lt;mark&gt;/g, '<mark>').replace(/&lt;\/mark&gt;/g, '</mark>');
-}
-
 watch(
     () => route.query,
     value => {
@@ -155,7 +144,7 @@ onMounted(loadSearch);
                 <Card
                     v-for="item in hits"
                     :key="item.id"
-                    :title-html="renderMarkedText(item.formatted?.title, item.title)"
+                    :title-html="renderSafeMarkedHtml(item.formatted?.title, item.title)"
                     :icon="NewspaperOutline"
                     class="result-card"
                     @click="openArticle(item.id)"
@@ -164,7 +153,7 @@ onMounted(loadSearch);
                         <p
                             class="summary"
                             v-html="
-                                renderMarkedText(
+                                renderSafeMarkedHtml(
                                     item.formatted?.summary,
                                     item.summary || '暂无摘要'
                                 )
@@ -183,7 +172,7 @@ onMounted(loadSearch);
                                 <n-icon :component="PersonOutline" />
                                 <span
                                     v-html="
-                                        renderMarkedText(
+                                        renderSafeMarkedHtml(
                                             item.formatted?.authorName,
                                             item.authorName || '-'
                                         )

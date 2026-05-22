@@ -3,6 +3,7 @@ import { SearchTask } from '@/shared/task';
 import { ChildrenValues, TaskCommonResult, TaskHandler, WorkflowResult } from '@/workers/types';
 import { extractUpsteamData, shouldSkip } from '@/workers/helpers/common.helper';
 import { EmbeddingService } from '@/services/embedding.service';
+import { clampInt } from '@/utils/number';
 
 export class VectorSearchHandler implements TaskHandler<SearchTask> {
     public taskType = 'search:vector';
@@ -30,7 +31,7 @@ export class VectorSearchHandler implements TaskHandler<SearchTask> {
             );
         }
 
-        const limit = Math.min(20, Math.max(1, Number(task.payload.metadata?.limit) || 10));
+        const limit = clampInt(task.payload.metadata?.limit, 10, 1, 20);
         const result = await EmbeddingService.getNearestVectors(embedding, limit);
         const ids = (result.ids?.[0] || []) as string[];
         const distances = (result.distances?.[0] || []) as number[];

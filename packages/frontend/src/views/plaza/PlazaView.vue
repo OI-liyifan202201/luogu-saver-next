@@ -16,7 +16,7 @@ import type { PlazaArticle } from '@/types/article';
 import Card from '@/components/Card.vue';
 import CardTitle from '@/components/CardTitle.vue';
 import UserLink from '@/components/UserLink.vue';
-import { ARTICLE_CATEGORIES } from '@/utils/constants';
+import { getCategoryColor, getCategoryIcon, getCategoryLabel } from '@/utils/article.ts';
 import { hexToRgba } from '@/utils/render.ts';
 
 const router = useRouter();
@@ -86,21 +86,6 @@ onMounted(() => {
 onUnmounted(() => {
     if (observer) observer.disconnect();
 });
-
-const getCategoryLabel = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].label;
-    return ARTICLE_CATEGORIES[9]!.label;
-};
-
-const getCategoryColor = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].color;
-    return ARTICLE_CATEGORIES[9]!.color;
-};
-
-const getCategoryIcon = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].icon;
-    return ARTICLE_CATEGORIES[9]!.icon;
-};
 
 const goToDetail = (id: string) => {
     const route = router.resolve({ path: `/article/${id}` });

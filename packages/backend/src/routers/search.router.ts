@@ -2,6 +2,7 @@ import Router from 'koa-router';
 import { Context, DefaultState } from 'koa';
 import { SearchService } from '@/services/search.service';
 import { logger } from '@/lib/logger';
+import { clampInt } from '@/utils/number';
 
 const router = new Router<DefaultState, Context>({ prefix: '/search' });
 
@@ -15,8 +16,8 @@ router.get('/articles', async (ctx: Context) => {
     try {
         const result = await SearchService.searchArticles({
             q: typeof ctx.query.q === 'string' ? ctx.query.q : '',
-            page: Math.max(1, Number(ctx.query.page) || 1),
-            limit: Math.min(50, Math.max(1, Number(ctx.query.limit) || 10)),
+            page: clampInt(ctx.query.page, 1, 1, Number.MAX_SAFE_INTEGER),
+            limit: clampInt(ctx.query.limit, 10, 1, 50),
             category: parseOptionalNumber(ctx.query.category),
             authorId: parseOptionalNumber(ctx.query.authorId)
         });

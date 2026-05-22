@@ -33,6 +33,7 @@ const reindexing = ref(false);
 const rebuildingSummaries = ref(false);
 const batchSize = ref(100);
 const summaryBatchSize = ref(20);
+const summaryConcurrency = ref(5);
 const { setupTaskUpdateListener } = useContentSaver();
 
 const canManageUsers = computed(() =>
@@ -96,7 +97,10 @@ async function handleReindex() {
 
 async function handleSummaryRebuild() {
     rebuildingSummaries.value = true;
-    const response = await rebuildArticleSummaries(summaryBatchSize.value);
+    const response = await rebuildArticleSummaries(
+        summaryBatchSize.value,
+        summaryConcurrency.value
+    );
     if (response.code !== 200) {
         message.error(response.message);
         rebuildingSummaries.value = false;
@@ -201,6 +205,19 @@ onMounted(async () => {
                                     :min="1"
                                     :max="500"
                                     placeholder="默认 100，范围 1-500"
+                                />
+                            </n-form-item>
+                            <n-form-item
+                                label="并发数"
+                                label-placement="left"
+                                :show-feedback="false"
+                                class="batch-size-field"
+                            >
+                                <n-input-number
+                                    v-model:value="summaryConcurrency"
+                                    :min="1"
+                                    :max="20"
+                                    placeholder="默认 5，范围 1-20"
                                 />
                             </n-form-item>
                             <n-button

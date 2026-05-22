@@ -78,11 +78,15 @@ router.post(
     '/articles/summary/rebuild',
     requiresPermission(Permission.MANAGE_SEARCH),
     async (ctx: Context) => {
-        const { batchSize } = ctx.request.body as { batchSize?: number };
+        const { batchSize, concurrency } = ctx.request.body as {
+            batchSize?: number;
+            concurrency?: number;
+        };
         const result = await WorkflowService.createWorkflowFromTemplate(
             'article-summary-rebuild-pipeline',
             {
-                batchSize: batchSize || 20
+                batchSize: batchSize || 20,
+                concurrency: concurrency || 5
             }
         );
         ctx.success(result);

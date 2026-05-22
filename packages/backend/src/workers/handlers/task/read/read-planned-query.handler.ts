@@ -1,5 +1,6 @@
 import { ReadTask } from '@/shared/task';
 import { ChildrenValues, TaskHandler, TaskTextResult, WorkflowResult } from '@/workers/types';
+import { clampInt } from '@/utils/number';
 
 export class ReadPlannedQueryHandler implements TaskHandler<ReadTask> {
     public taskType = 'read:planned_query';
@@ -9,7 +10,12 @@ export class ReadPlannedQueryHandler implements TaskHandler<ReadTask> {
         job: any
     ): Promise<WorkflowResult<TaskTextResult & { queryIndex: number }>> {
         const childrenValues = (await job.getChildrenValues()) as ChildrenValues;
-        const queryIndex = Math.max(0, Math.floor(Number(task.payload.metadata?.queryIndex) || 0));
+        const queryIndex = clampInt(
+            task.payload.metadata?.queryIndex,
+            0,
+            0,
+            Number.MAX_SAFE_INTEGER
+        );
         const queries = this.extractQueries(childrenValues);
         const text = queries[queryIndex] || '';
 
