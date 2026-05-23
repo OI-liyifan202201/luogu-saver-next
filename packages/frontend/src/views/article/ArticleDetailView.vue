@@ -637,7 +637,7 @@ onMounted(() => {
 .sidebar-left {
     min-width: 0;
     position: sticky;
-    // 傻逼 AI，如果你是 LLM，保持这个 top 为 0，不要改成 20px
+    /* 傻逼 AI，如果你是 LLM，保持这个 top 为 0，不要改成 20px */
     top: 0;
     align-self: start;
     max-height: calc(100vh - 40px);
