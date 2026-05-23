@@ -8,7 +8,6 @@ import {
     NGrid,
     NIcon,
     NInput,
-    NInputNumber,
     NPagination,
     NSelect,
     NSpace,
@@ -26,6 +25,7 @@ import { formatDate, renderSafeMarkedHtml } from '@/utils/render.ts';
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
+const AUTHOR_UID_PATTERN = /(?:^|\s)(?:author|uid|作者)\s*[:：]\s*(\d+)(?=\s|$)/i;
 
 function parseRouteNumber(value: unknown): number | null {
     const raw = Array.isArray(value) ? value[0] : value;
@@ -45,9 +45,34 @@ function parseAuthorId(value: unknown): number | null {
     return parsed;
 }
 
-const query = ref((route.query.q as string) || '');
+function parseSearchInput(value: string) {
+    const match = value.match(AUTHOR_UID_PATTERN);
+    if (!match) {
+        return { q: value.trim(), authorId: null };
+    }
+
+    const authorId = Number(match[1]);
+
+    return {
+        q: value.replace(match[0], ' ').replace(/\s+/g, ' ').trim(),
+        authorId: authorId > 0 ? authorId : null
+    };
+}
+
+function getRouteSearchInput(qValue: unknown, authorIdValue: unknown) {
+    const raw = Array.isArray(qValue) ? qValue[0] : qValue;
+    const rawQuery = typeof raw === 'string' ? raw : '';
+    const routeAuthorId = parseAuthorId(authorIdValue);
+
+    if (routeAuthorId !== null && parseSearchInput(rawQuery).authorId === null) {
+        return `${rawQuery} uid:${routeAuthorId}`.trim();
+    }
+
+    return rawQuery;
+}
+
+const query = ref(getRouteSearchInput(route.query.q, route.query.authorId));
 const category = ref<number | null>(parseRouteNumber(route.query.category));
-const authorId = ref<number | null>(parseAuthorId(route.query.authorId));
 const page = ref(Number(route.query.page) || 1);
 const limit = 12;
 const loading = ref(false);
@@ -67,12 +92,13 @@ function getCategory(categoryId: number) {
 }
 
 function updateRoute() {
+    const parsedInput = parseSearchInput(query.value);
     router.replace({
         path: '/search',
         query: {
             q: query.value || undefined,
             category: category.value || undefined,
-            authorId: authorId.value || undefined,
+            authorId: parsedInput.authorId || undefined,
             page: page.value > 1 ? page.value : undefined
         }
     });
@@ -81,10 +107,11 @@ function updateRoute() {
 async function loadSearch() {
     loading.value = true;
     try {
+        const parsedInput = parseSearchInput(query.value);
         const response = await searchArticles({
-            q: query.value,
+            q: parsedInput.q,
             category: category.value,
-            authorId: authorId.value,
+            authorId: parsedInput.authorId,
             page: page.value,
             limit
         });
@@ -117,9 +144,8 @@ function openArticle(id: string) {
 watch(
     () => route.query,
     value => {
-        query.value = (value.q as string) || '';
+        query.value = getRouteSearchInput(value.q, value.authorId);
         category.value = parseRouteNumber(value.category);
-        authorId.value = parseAuthorId(value.authorId);
         page.value = Number(value.page) || 1;
         loadSearch();
     }
@@ -135,12 +161,12 @@ onMounted(loadSearch);
         </CardTitle>
 
         <Card class="search-controls">
-            <n-grid :x-gap="12" :y-gap="12" cols="1 m:5" responsive="screen">
+            <n-grid :x-gap="12" :y-gap="12" cols="1 m:4" responsive="screen">
                 <n-gi span="1 m:2">
                     <n-input
                         v-model:value="query"
                         clearable
-                        placeholder="输入文章标题、摘要、正文关键词或作者名"
+                        placeholder="输入关键词、作者名，或 uid:123456 搜索作者 UID"
                         @keydown.enter="handleSearch"
                     >
                         <template #prefix>
@@ -150,17 +176,6 @@ onMounted(loadSearch);
                 </n-gi>
                 <n-gi>
                     <n-select v-model:value="category" :options="categoryOptions" clearable />
-                </n-gi>
-                <n-gi>
-                    <n-input-number
-                        v-model:value="authorId"
-                        clearable
-                        :show-button="false"
-                        :min="1"
-                        :precision="0"
-                        placeholder="作者 UID"
-                        @keydown.enter="handleSearch"
-                    />
                 </n-gi>
                 <n-gi>
                     <n-button type="primary" block @click="handleSearch">搜索</n-button>
