@@ -8,7 +8,7 @@ export class UpdateArticleEmbeddingRebuildHandler implements TaskHandler<UpdateT
 
     public async handle(task: UpdateTask): Promise<WorkflowResult<TaskCommonResult>> {
         const batchSize = clampInt(task.payload.metadata?.batchSize, 20, 1, 100);
-        const concurrency = clampInt(task.payload.metadata?.concurrency, 5, 1, 20);
+        const concurrency = clampInt(task.payload.metadata?.concurrency, 5, 1, 50);
         const result = await EmbeddingService.rebuildArticleEmbeddings(batchSize, concurrency);
 
         return {

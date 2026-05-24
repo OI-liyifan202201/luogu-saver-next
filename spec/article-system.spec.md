@@ -242,7 +242,7 @@ Input parameters:
 | Parameter     | Type   | Required | Default | Constraint            |
 | ------------- | ------ | -------- | ------- | --------------------- |
 | `batchSize`   | number | no       | 20      | Integer in `[1, 100]` |
-| `concurrency` | number | no       | 5       | Integer in `[1, 20]`  |
+| `concurrency` | number | no       | 5       | Integer in `[1, 50]`  |
 
 Task `rebuild-embedding` SHALL:
 

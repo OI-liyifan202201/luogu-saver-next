@@ -394,8 +394,8 @@ onMounted(async () => {
                                 <n-input-number
                                     v-model:value="embeddingConcurrency"
                                     :min="1"
-                                    :max="20"
-                                    placeholder="默认 5，范围 1-20"
+                                    :max="50"
+                                    placeholder="默认 5，范围 1-50"
                                 />
                             </n-form-item>
                             <n-button

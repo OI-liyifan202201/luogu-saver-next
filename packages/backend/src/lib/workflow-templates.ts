@@ -21,7 +21,7 @@ const normalizeEmbeddingRebuildBatchSize = (value: any) => {
 };
 
 const normalizeEmbeddingRebuildConcurrency = (value: any) => {
-    return clampInt(value, 5, 1, 20);
+    return clampInt(value, 5, 1, 50);
 };
 
 const normalizeRagArticleIds = (value: any) => {
