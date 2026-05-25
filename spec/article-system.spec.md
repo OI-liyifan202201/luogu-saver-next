@@ -201,7 +201,81 @@ When saving an article:
 3. All article queries include the `author` relation.
 4. Content truncation preserves UTF-8 character boundaries.
 
-## 9. File Locations
+## 9. Summary Rebuild Workflow
+
+The workflow template `article-summary-rebuild-pipeline` SHALL rebuild summaries for all non-deleted articles.
+
+Input parameters:
+
+| Parameter     | Type   | Required | Default | Constraint            |
+| ------------- | ------ | -------- | ------- | --------------------- |
+| `batchSize`   | number | no       | 20      | Integer in `[1, 100]` |
+| `concurrency` | number | no       | 5       | Integer in `[1, 20]`  |
+
+Task `rebuild-summary` SHALL:
+
+1. Have type `update`.
+2. Have target `article_summary_rebuild`.
+3. Have `targetId='articles'`.
+4. Have `metadata.batchSize` equal to normalized `batchSize`.
+5. Have `metadata.concurrency` equal to normalized `concurrency`.
+6. Set `track=true`.
+7. Set `report=true`.
+8. Require permission `MANAGE_SEARCH`.
+
+The update handler for `article_summary_rebuild` SHALL:
+
+1. Load non-deleted articles from the database in ascending `id` order.
+2. Process each loaded batch with at most `metadata.concurrency` articles running at the same time.
+3. For each article, call the summary LLM scenario with the same summary prompt semantics as `llm:summary`.
+4. Persist the generated summary to `article.summary`.
+5. After persisting a summary, update the search index document for that article if search indexing is enabled.
+6. Continue processing if one article fails and record that article ID in `failedArticleIds`.
+7. Return `{ processed, updated, failed, failedArticleIds }`.
+
+## 10. Embedding Rebuild Workflow
+
+The workflow template `article-embedding-rebuild-pipeline` SHALL rebuild Chroma embeddings for all non-deleted articles.
+
+Input parameters:
+
+| Parameter     | Type   | Required | Default | Constraint            |
+| ------------- | ------ | -------- | ------- | --------------------- |
+| `batchSize`   | number | no       | 20      | Integer in `[1, 100]` |
+| `concurrency` | number | no       | 5       | Integer in `[1, 50]`  |
+
+Task `rebuild-embedding` SHALL:
+
+1. Have type `update`.
+2. Have target `article_embedding_rebuild`.
+3. Have `targetId='articles'`.
+4. Have `metadata.batchSize` equal to normalized `batchSize`.
+5. Have `metadata.concurrency` equal to normalized `concurrency`.
+6. Set `track=true`.
+7. Set `report=true`.
+8. Require permission `MANAGE_SEARCH`.
+
+The update handler for `article_embedding_rebuild` SHALL:
+
+1. Load non-deleted articles from the database in ascending `id` order.
+2. Process each loaded batch with at most `metadata.concurrency` articles running at the same time.
+3. For each article, call the embedding LLM scenario with `article.summary` when it is a non-empty string, otherwise with `article.content`; upsert that vector as the summary vector.
+4. For each article, split `article.content` into chunks of 4000 characters with 300 characters overlap; call the embedding LLM scenario for each chunk; upsert each chunk vector.
+5. Before inserting chunk vectors for an article, delete existing Chroma chunk vectors with metadata `articleId=article.id` and `kind="chunk"`.
+6. Summary vectors SHALL use ID `article.id`; chunk vectors SHALL use ID `${article.id}:chunk:${index}`.
+7. Vector metadata SHALL include `{ articleId, kind, title, authorId, category, tags }`; chunk vectors SHALL also include `{ chunkIndex, start, end }`.
+8. Continue processing if one article fails and record that article ID in `failedArticleIds`.
+9. Return `{ processed, updated, failed, failedArticleIds }`.
+
+The update handler for `article_embedding` SHALL:
+
+1. Read the article from the database by `targetId`.
+2. If upstream summary output contains non-empty `data.summary`, use that value for the summary vector document.
+3. If upstream summary output is absent, use `article.summary` when non-empty, otherwise `article.content`.
+4. Split `article.content` into chunks and upsert chunk vectors as specified for `article_embedding_rebuild`.
+5. Not modify `article.content` or any article row.
+
+## 11. File Locations
 
 - Article entity: `packages/backend/src/entities/article.ts`
 - Article history entity: `packages/backend/src/entities/article-history.ts`

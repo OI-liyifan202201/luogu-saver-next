@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, inject } from 'vue';
-import { NGrid, NGi, NIcon, NStatistic, NDivider } from 'naive-ui';
+import { NEmpty, NGrid, NGi, NIcon, NStatistic, NDivider } from 'naive-ui';
 import { Newspaper, Clipboard, Megaphone } from '@vicons/ionicons5';
 import { getArticleCount } from '@/api/article.ts';
 import { getPasteCount } from '@/api/paste.ts';
+import { getCurrentAnnouncement, type Announcement } from '@/api/announcement.ts';
 import ThemeEditor from '@/components/ThemeEditor.vue';
 import HomeHero from '@/components/HomeHero.vue';
 import Card from '@/components/Card.vue';
@@ -11,6 +12,7 @@ import { uiThemeKey } from '@/styles/theme/themeKeys.ts';
 
 const articleCount = ref(0);
 const pasteCount = ref(0);
+const announcement = ref<Announcement | null>(null);
 // const saveUrl = ref('');
 
 const themeVars = inject(uiThemeKey)!;
@@ -18,6 +20,7 @@ const themeVars = inject(uiThemeKey)!;
 onMounted(async () => {
     getArticleCount().then(res => (articleCount.value = res.data.count));
     getPasteCount().then(res => (pasteCount.value = res.data.count));
+    getCurrentAnnouncement().then(res => (announcement.value = res.data));
 });
 
 /*
@@ -37,7 +40,7 @@ const handleSave = () => {
         <div class="main-content">
             <n-grid :x-gap="20" :y-gap="20" cols="1 m:2 l:3" responsive="screen">
                 <n-gi span="1 m:1 l:2">
-                    <Card title="公告" class="home-card">
+                    <Card :title="announcement?.title || '公告'" class="home-card">
                         <template #header-extra>
                             <n-icon
                                 size="20"
@@ -45,7 +48,12 @@ const handleSave = () => {
                                 :color="themeVars.primaryColor"
                             />
                         </template>
-                        <div class="announcement-content">This is a sample announcement text.</div>
+                        <div
+                            v-if="announcement"
+                            class="announcement-content"
+                            v-html="announcement.content"
+                        ></div>
+                        <n-empty v-else description="暂无公告" />
                     </Card>
                 </n-gi>
 

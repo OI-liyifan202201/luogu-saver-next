@@ -66,7 +66,11 @@ export class WorkerHost<T extends CommonTask> {
         this.worker.on('completed', async job => {
             logger.info({ jobId: job.id }, 'Job completed successfully.');
             if (this.shouldEmitTaskEvent(job)) {
-                emitToRoom(`task:${job.id}`, `task:${job.id}:completed`, { status: 'completed' });
+                const returnvalue = job.returnvalue as any;
+                emitToRoom(`task:${job.id}`, `task:${job.id}:completed`, {
+                    status: 'completed',
+                    result: this.sanitizeReportedResult(returnvalue?.__result)
+                });
             }
             await TaskService.updateTask(
                 job.id!,
@@ -123,6 +127,18 @@ export class WorkerHost<T extends CommonTask> {
     private shouldEmitTaskEvent(job?: Job<T>) {
         if (!job?.data?.workflowId) return true;
         return job.data.report === true;
+    }
+
+    private sanitizeReportedResult(result: any) {
+        if (!result?.data?.embedding) return result;
+        return {
+            ...result,
+            data: {
+                ...result.data,
+                embedding: [],
+                embeddingLength: result.data.embeddingLength || result.data.embedding.length
+            }
+        };
     }
 
     public async close() {

@@ -217,10 +217,11 @@ interface TaskHandler<T extends CommonTask> {
 
 ### 7.3 Registered Handlers
 
-| Handler Key    | Handler Class  | Description                  |
-| -------------- | -------------- | ---------------------------- |
-| `save:article` | ArticleHandler | Fetch and save Luogu article |
-| `save:paste`   | PasteHandler   | Fetch and save Luogu paste   |
+| Handler Key    | Handler Class  | Description                       |
+| -------------- | -------------- | --------------------------------- |
+| `save:article` | ArticleHandler | Fetch and save Luogu article      |
+| `save:paste`   | PasteHandler   | Fetch and save Luogu paste        |
+| `save:profile` | ProfileHandler | Fetch and save Luogu user profile |
 
 ## 8. Configuration
 
@@ -235,7 +236,57 @@ Queue behavior is controlled by `config.queue`:
 | `maxQueueLength`       | Maximum pending jobs in queue           |
 | `processInterval`      | Job processing interval in ms           |
 
-## 9. Invariants
+## 9. Public Queue Statistics
+
+The queue statistics subsystem exposes read-only queue state without requiring login.
+
+### 9.1 HTTP Endpoint
+
+`GET /stats/queues` SHALL return HTTP 200 with data:
+
+```typescript
+interface QueueStatsResponse {
+    generatedAt: string;
+    queuePoolSize: number;
+    queues: QueueStatsItem[];
+}
+
+interface QueueStatsItem {
+    name: string;
+    taskType: 'save' | 'llm' | 'update' | 'search' | 'read' | 'rag';
+    label: string;
+    concurrency: number;
+    isPaused: boolean;
+    counts: {
+        waiting: number;
+        active: number;
+        delayed: number;
+        completed: number;
+        failed: number;
+        paused: number;
+        prioritized: number;
+        waitingChildren: number;
+    };
+}
+```
+
+The `queues` array SHALL contain exactly one item for each queue name in `QUEUE_NAMES`.
+
+The endpoint SHALL NOT include job payloads, job return values, error stack traces, user IDs, article IDs, or workflow IDs.
+
+### 9.2 WebSocket Room
+
+Room `stats:queues` SHALL publish event `stats:queues:update`.
+
+Each event payload SHALL have the same schema as `GET /stats/queues` response data.
+
+When a client joins `stats:queues`, the server SHALL emit one `stats:queues:update` event to that socket.
+
+While one or more clients are subscribed to `stats:queues`, the server SHALL emit one `stats:queues:update` event to the room every 2 seconds.
+
+When no clients are subscribed to `stats:queues`, the server SHALL stop the periodic queue statistics timer.
+
+## 10. Invariants
 
 1. Each task has a unique 8-character ID.
 2. Task status transitions: PENDING -> PROCESSING -> (COMPLETED | FAILED).
@@ -243,7 +294,7 @@ Queue behavior is controlled by `config.queue`:
 4. Queue names are derived from task types via constant mapping.
 5. A duplicate random task ID does not overwrite an existing task row.
 
-## 10. File Locations
+## 11. File Locations
 
 - Task entity: `packages/backend/src/entities/task.ts`
 - Task types: `packages/backend/src/shared/task.ts`

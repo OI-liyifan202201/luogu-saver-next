@@ -8,8 +8,6 @@ import {
     NIcon,
     NTag,
     NDivider,
-    NGrid,
-    NGi,
     NSkeleton,
     NAnchor,
     NAnchorLink,
@@ -27,7 +25,8 @@ import {
     NewspaperOutline,
     CalendarOutline,
     ListOutline,
-    TimeOutline
+    TimeOutline,
+    LibraryOutline
 } from '@vicons/ionicons5';
 
 import { useContentSaver } from '@/composables/useContentSaver';
@@ -51,6 +50,8 @@ import { ARTICLE_CATEGORIES, CACHE_STORAGE_KEY, UNKNOWN_CATEGORY } from '@/utils
 import { formatDate } from '@/utils/render';
 
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
+import { isAuthenticated, startCpOAuthLogin } from '@/utils/auth.ts';
+import { useKnowledgeBase } from '@/utils/knowledge-base.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -68,6 +69,7 @@ const {
 const articleId = route.params.id as string;
 const article = ref<Article | null>(null);
 const loading = ref(true);
+const knowledgeBase = useKnowledgeBase();
 
 const recommended = ref<PlazaArticle[]>([]);
 const recLoading = ref(false);
@@ -229,6 +231,30 @@ const handleDelete = () => {
     message.info('删除功能暂未开放');
 };
 
+const isInKnowledgeBase = computed(() => knowledgeBase.hasArticle(articleId));
+
+const handleKnowledgeBaseToggle = () => {
+    if (!article.value) return;
+    if (!isAuthenticated.value) {
+        message.warning('请先登录后再管理知识库');
+        startCpOAuthLogin(`/article/${articleId}`);
+        return;
+    }
+
+    if (isInKnowledgeBase.value) {
+        knowledgeBase.removeArticle(articleId);
+        message.success('已从知识库移除');
+        return;
+    }
+
+    const result = knowledgeBase.addArticle({ id: article.value.id, title: article.value.title });
+    if (!result.ok && result.reason === 'limit') {
+        message.warning('知识库最多存放 10 篇文章');
+        return;
+    }
+    message.success(result.reason === 'exists' ? '文章已在知识库中' : '已加入知识库');
+};
+
 const currentCategory = computed(() => {
     if (article.value?.category && ARTICLE_CATEGORIES[article.value.category]) {
         return ARTICLE_CATEGORIES[article.value.category] || UNKNOWN_CATEGORY;
@@ -247,22 +273,51 @@ onMounted(() => {
             class="article-layout"
             :class="{
                 'has-toc': tocItems.length > 0,
-                'has-history': versionHistory.length > 0
+                'has-history': loading || versionHistory.length > 0
             }"
         >
-            <div class="article-header">
-                <LoadingSkeleton :loading="loading">
-                    <template #skeleton>
-                        <Card>
-                            <div style="margin-bottom: 8px">
-                                <n-skeleton
-                                    text
-                                    style="width: 40%; height: 28px; margin-bottom: 8px"
+            <aside class="sidebar-left">
+                <SidebarWidget
+                    v-if="tocItems.length > 0"
+                    title="目录"
+                    :icon="ListOutline"
+                    class="toc-card"
+                >
+                    <n-anchor
+                        class="toc-anchor"
+                        type="block"
+                        :bound="100"
+                        ignore-gap
+                        :show-rail="true"
+                        :show-background="true"
+                    >
+                        <template v-for="item in tocItems" :key="item.href">
+                            <n-anchor-link :title="item.title" :href="item.href">
+                                <n-anchor-link
+                                    v-for="child in item.children"
+                                    :key="child.href"
+                                    :title="child.title"
+                                    :href="child.href"
                                 />
-                            </div>
-                            <n-divider style="margin: 12px 0" />
-                            <n-grid x-gap="12" cols="1 s:2">
-                                <n-gi>
+                            </n-anchor-link>
+                        </template>
+                    </n-anchor>
+                </SidebarWidget>
+            </aside>
+
+            <div class="center-column">
+                <div class="article-header">
+                    <LoadingSkeleton :loading="loading">
+                        <template #skeleton>
+                            <Card>
+                                <div style="margin-bottom: 8px">
+                                    <n-skeleton
+                                        text
+                                        style="width: 40%; height: 28px; margin-bottom: 8px"
+                                    />
+                                </div>
+                                <n-divider style="margin: 12px 0" />
+                                <div class="info-grid">
                                     <div class="info-item">
                                         <span class="label">作者</span>
                                         <div
@@ -277,8 +332,6 @@ onMounted(() => {
                                             <n-skeleton text style="width: 80px" />
                                         </div>
                                     </div>
-                                </n-gi>
-                                <n-gi>
                                     <div class="info-item">
                                         <span class="label">分类</span>
                                         <div
@@ -293,32 +346,28 @@ onMounted(() => {
                                             <n-skeleton text style="width: 60px" />
                                         </div>
                                     </div>
-                                </n-gi>
-                            </n-grid>
-                        </Card>
-                    </template>
+                                </div>
+                            </Card>
+                        </template>
 
-                    <div v-if="article">
-                        <Card :title="article.title" :icon="NewspaperOutline">
-                            <div class="meta-row">
-                                <n-tag :bordered="false" size="small">
-                                    <template #icon>
-                                        <NIcon :component="CalendarOutline" />
-                                    </template>
-                                    更新于 {{ formatDate(article.updatedAt) }}
-                                </n-tag>
-                            </div>
+                        <div v-if="article">
+                            <Card :title="article.title" :icon="NewspaperOutline">
+                                <div class="meta-row">
+                                    <n-tag :bordered="false" size="small">
+                                        <template #icon>
+                                            <NIcon :component="CalendarOutline" />
+                                        </template>
+                                        更新于 {{ formatDate(article.updatedAt) }}
+                                    </n-tag>
+                                </div>
 
-                            <n-divider style="margin: 12px 0" />
+                                <n-divider style="margin: 12px 0" />
 
-                            <n-grid x-gap="12" cols="1 s:2">
-                                <n-gi>
+                                <div class="info-grid">
                                     <div class="info-item">
                                         <span class="label">作者</span>
                                         <UserLink :user="article.author" show-avatar />
                                     </div>
-                                </n-gi>
-                                <n-gi>
                                     <div class="info-item">
                                         <span class="label">分类</span>
                                         <div class="category-link">
@@ -334,92 +383,61 @@ onMounted(() => {
                                             >
                                         </div>
                                     </div>
-                                </n-gi>
-                            </n-grid>
+                                </div>
 
-                            <n-divider style="margin: 12px 0" />
+                                <n-divider style="margin: 12px 0" />
 
-                            <n-space>
-                                <n-button size="small" @click="router.go(-1)">
-                                    <template #icon>
-                                        <NIcon :component="ArrowBackOutline" />
-                                    </template>
-                                    返回
-                                </n-button>
-                                <n-button
-                                    size="small"
-                                    secondary
-                                    tag="a"
-                                    :href="`https://www.luogu.com/article/${article.id}`"
-                                    target="_blank"
-                                >
-                                    <template #icon>
-                                        <NIcon :component="ShareSocialOutline" />
-                                    </template>
-                                    原站
-                                </n-button>
-                                <n-button size="small" secondary @click="handleCopy">
-                                    <template #icon>
-                                        <NIcon :component="CopyOutline" />
-                                    </template>
-                                    源码
-                                </n-button>
-                                <n-button size="small" type="primary" @click="handleUpdate">
-                                    <template #icon>
-                                        <NIcon :component="SyncOutline" />
-                                    </template>
-                                    更新
-                                </n-button>
-                                <n-button size="small" type="error" ghost @click="handleDelete">
-                                    <template #icon>
-                                        <NIcon :component="TrashOutline" />
-                                    </template>
-                                    删除
-                                </n-button>
-                            </n-space>
-                        </Card>
-                    </div>
-                </LoadingSkeleton>
-            </div>
-
-            <aside v-if="tocItems.length > 0" class="sidebar-left">
-                <SidebarWidget title="目录" :icon="ListOutline" class="toc-card">
-                    <n-anchor :show-rail="true" :show-background="true" type="block" :bound="100">
-                        <template v-for="item in tocItems" :key="item.href">
-                            <n-anchor-link :title="item.title" :href="item.href">
-                                <n-anchor-link
-                                    v-for="child in item.children"
-                                    :key="child.href"
-                                    :title="child.title"
-                                    :href="child.href"
-                                />
-                            </n-anchor-link>
-                        </template>
-                    </n-anchor>
-                </SidebarWidget>
-            </aside>
-
-            <main class="main-content">
-                <div>
-                    <LoadingSkeleton :loading="loading">
-                        <template #skeleton>
-                            <Card>
-                                <n-space vertical size="large">
-                                    <n-space vertical>
-                                        <n-skeleton text :repeat="2" />
-                                        <n-skeleton text style="width: 60%" />
-                                    </n-space>
-                                    <n-skeleton height="120px" style="border-radius: 4px" />
-                                    <n-space vertical>
-                                        <n-skeleton text :repeat="4" />
-                                    </n-space>
+                                <n-space>
+                                    <n-button size="small" @click="router.go(-1)">
+                                        <template #icon>
+                                            <NIcon :component="ArrowBackOutline" />
+                                        </template>
+                                        返回
+                                    </n-button>
+                                    <n-button
+                                        size="small"
+                                        secondary
+                                        tag="a"
+                                        :href="`https://www.luogu.com/article/${article.id}`"
+                                        target="_blank"
+                                    >
+                                        <template #icon>
+                                            <NIcon :component="ShareSocialOutline" />
+                                        </template>
+                                        原站
+                                    </n-button>
+                                    <n-button size="small" secondary @click="handleCopy">
+                                        <template #icon>
+                                            <NIcon :component="CopyOutline" />
+                                        </template>
+                                        源码
+                                    </n-button>
+                                    <n-button size="small" type="primary" @click="handleUpdate">
+                                        <template #icon>
+                                            <NIcon :component="SyncOutline" />
+                                        </template>
+                                        更新
+                                    </n-button>
+                                    <n-button
+                                        size="small"
+                                        secondary
+                                        :type="isInKnowledgeBase ? 'warning' : 'info'"
+                                        @click="handleKnowledgeBaseToggle"
+                                    >
+                                        <template #icon>
+                                            <NIcon :component="LibraryOutline" />
+                                        </template>
+                                        {{ isInKnowledgeBase ? '移出知识库' : '加入知识库' }}
+                                    </n-button>
+                                    <n-button size="small" type="error" ghost @click="handleDelete">
+                                        <template #icon>
+                                            <NIcon :component="TrashOutline" />
+                                        </template>
+                                        删除
+                                    </n-button>
                                 </n-space>
                             </Card>
-                        </template>
-
-                        <Card v-if="article">
-                            <MarkdownViewer :content="displayContent" />
-                        </Card>
+                        </div>
                     </LoadingSkeleton>
 
                     <div v-if="article" style="margin-top: 20px">
@@ -427,110 +445,154 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div style="margin-top: 20px">
-                    <LoadingSkeleton :loading="recLoading">
-                        <template #skeleton>
-                            <Card title="相关推荐">
-                                <div class="article-list">
-                                    <div v-for="i in 3" :key="i" class="article-item">
-                                        <n-skeleton text :repeat="2" />
-                                    </div>
-                                </div>
+                <main class="main-content">
+                    <div>
+                        <LoadingSkeleton :loading="loading">
+                            <template #skeleton>
+                                <Card>
+                                    <n-space vertical size="large">
+                                        <n-space vertical>
+                                            <n-skeleton text :repeat="2" />
+                                            <n-skeleton text style="width: 60%" />
+                                        </n-space>
+                                        <n-skeleton height="120px" style="border-radius: 4px" />
+                                        <n-space vertical>
+                                            <n-skeleton text :repeat="4" />
+                                        </n-space>
+                                    </n-space>
+                                </Card>
+                            </template>
+
+                            <Card v-if="article">
+                                <MarkdownViewer :content="displayContent" :pre-rendered="true" />
                             </Card>
-                        </template>
+                        </LoadingSkeleton>
+                    </div>
 
-                        <Card v-if="recommended.length" title="相关推荐">
-                            <div class="article-list">
-                                <div v-for="it in recommended" :key="it.id" class="article-item">
-                                    <Card
-                                        :title="it.title"
-                                        :icon="NewspaperOutline"
-                                        class="clickable-card"
-                                        @click="openArticle(it.id)"
-                                    >
-                                        <template #title-extra>
-                                            <n-tag
-                                                v-if="it.reason === 'title'"
-                                                :color="{
-                                                    textColor: '#ff6200',
-                                                    color: 'rgba(255, 98, 0, 0.15)',
-                                                    borderColor: '#ff6200'
-                                                }"
-                                                size="small"
-                                            >
-                                                标题相关
-                                            </n-tag>
-                                            <n-tag
-                                                v-else-if="it.reason === 'vector'"
-                                                :color="{
-                                                    textColor: '#00aaff',
-                                                    color: 'rgba(0, 170, 255, 0.15)',
-                                                    borderColor: '#00aaff'
-                                                }"
-                                                size="small"
-                                            >
-                                                相似文章
-                                            </n-tag>
-                                        </template>
-
-                                        <div class="article-summary">
-                                            {{ it.summary || '暂无预览...' }}
+                    <div style="margin-top: 20px">
+                        <LoadingSkeleton :loading="recLoading">
+                            <template #skeleton>
+                                <Card title="相关推荐">
+                                    <div class="article-list">
+                                        <div v-for="i in 3" :key="i" class="article-item">
+                                            <n-skeleton text :repeat="2" />
                                         </div>
+                                    </div>
+                                </Card>
+                            </template>
 
-                                        <n-divider style="margin: 12px 0" />
-
-                                        <div class="article-meta">
-                                            <div class="left">
-                                                <UserLink :user="it.author" show-avatar />
+                            <Card title="相关推荐">
+                                <div v-if="recommended.length" class="article-list">
+                                    <div
+                                        v-for="it in recommended"
+                                        :key="it.id"
+                                        class="article-item"
+                                    >
+                                        <Card
+                                            :title="it.title"
+                                            :icon="NewspaperOutline"
+                                            class="clickable-card"
+                                            @click="openArticle(it.id)"
+                                        >
+                                            <template #title-extra>
                                                 <n-tag
+                                                    v-if="it.reason === 'title'"
                                                     :color="{
-                                                        textColor: getCategoryColor(it.category),
-                                                        color: hexToRgba(
-                                                            getCategoryColor(it.category),
-                                                            0.2
-                                                        ),
-                                                        borderColor: getCategoryColor(it.category)
+                                                        textColor: '#ff6200',
+                                                        color: 'rgba(255, 98, 0, 0.15)',
+                                                        borderColor: '#ff6200'
                                                     }"
                                                     size="small"
                                                 >
-                                                    <template #icon>
-                                                        <n-icon
-                                                            :component="
-                                                                getCategoryIcon(it.category)
-                                                            "
-                                                        />
-                                                    </template>
-                                                    {{ getCategoryLabel(it.category) }}
+                                                    标题相关
                                                 </n-tag>
-                                            </div>
-                                            <div class="right">
-                                                <n-button
-                                                    text
+                                                <n-tag
+                                                    v-else-if="it.reason === 'vector'"
+                                                    :color="{
+                                                        textColor: '#00aaff',
+                                                        color: 'rgba(0, 170, 255, 0.15)',
+                                                        borderColor: '#00aaff'
+                                                    }"
                                                     size="small"
-                                                    type="primary"
-                                                    @click.stop="openArticle(it.id)"
                                                 >
-                                                    阅读全文
-                                                </n-button>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                </div>
-                            </div>
-                        </Card>
-                    </LoadingSkeleton>
-                </div>
-            </main>
+                                                    相似文章
+                                                </n-tag>
+                                            </template>
 
-            <aside v-if="versionHistory.length > 0" class="sidebar-right">
-                <SidebarWidget title="历史版本" :icon="TimeOutline" class="version-card">
-                    <n-timeline>
+                                            <div class="article-summary">
+                                                {{ it.summary || '暂无预览...' }}
+                                            </div>
+
+                                            <n-divider style="margin: 12px 0" />
+
+                                            <div class="article-meta">
+                                                <div class="left">
+                                                    <UserLink :user="it.author" show-avatar />
+                                                    <n-tag
+                                                        :color="{
+                                                            textColor: getCategoryColor(
+                                                                it.category
+                                                            ),
+                                                            color: hexToRgba(
+                                                                getCategoryColor(it.category),
+                                                                0.2
+                                                            ),
+                                                            borderColor: getCategoryColor(
+                                                                it.category
+                                                            )
+                                                        }"
+                                                        size="small"
+                                                    >
+                                                        <template #icon>
+                                                            <n-icon
+                                                                :component="
+                                                                    getCategoryIcon(it.category)
+                                                                "
+                                                            />
+                                                        </template>
+                                                        {{ getCategoryLabel(it.category) }}
+                                                    </n-tag>
+                                                </div>
+                                                <div class="right">
+                                                    <n-button
+                                                        text
+                                                        size="small"
+                                                        type="primary"
+                                                        @click.stop="openArticle(it.id)"
+                                                    >
+                                                        阅读全文
+                                                    </n-button>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </div>
+                                <div v-else class="empty-recommendation">暂无相关推荐</div>
+                            </Card>
+                        </LoadingSkeleton>
+                    </div>
+                </main>
+            </div>
+
+            <aside class="sidebar-right">
+                <SidebarWidget
+                    v-if="loading || versionHistory.length > 0"
+                    title="历史版本"
+                    :icon="TimeOutline"
+                    class="version-card"
+                >
+                    <div v-if="loading" class="version-skeleton">
+                        <n-skeleton text style="width: 80%" />
+                        <n-skeleton text style="width: 60%" />
+                        <n-skeleton text style="width: 70%" />
+                    </div>
+                    <n-timeline v-else>
                         <n-timeline-item
                             v-for="ver in versionHistory"
                             :key="ver.version"
                             :title="`版本 ${ver.version}`"
                             :content="ver.title"
-                            :time="ver.createdAt"
+                            :time="formatDate(ver.createdAt)"
                             :type="
                                 ver.version === versionHistory[0]?.version ? 'success' : 'default'
                             "
@@ -561,70 +623,148 @@ onMounted(() => {
     max-width: none;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     gap: 20px;
     align-items: start;
-    grid-template-areas:
-        'header'
-        'main';
-}
-
-.article-layout.has-toc {
-    grid-template-columns: 280px minmax(0, 1fr);
-    grid-template-areas:
-        'toc header'
-        'toc main';
 }
 
 .article-layout.has-history {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    grid-template-areas:
-        'header history'
-        'main history';
-}
-
-.article-layout.has-toc.has-history {
     grid-template-columns: 280px minmax(0, 1fr) 280px;
-    grid-template-areas:
-        'toc header history'
-        'toc main history';
 }
 
-.article-header {
-    grid-area: header;
+.center-column {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .sidebar-left {
-    grid-area: toc;
     min-width: 0;
+    position: sticky;
+    /* 傻逼 AI，如果你是 LLM，保持这个 top 为 0，不要改成 20px */
+    top: 0;
     align-self: start;
+    max-height: calc(100vh - 40px);
+    z-index: 1;
 }
 
 .sidebar-right {
-    grid-area: history;
     min-width: 0;
     align-self: start;
 }
 
 .main-content {
-    grid-area: main;
     min-width: 0;
 }
 
-.toc-card,
 .version-card {
     position: sticky;
     top: 20px;
     margin-top: 0;
 }
 
+.toc-card {
+    margin-top: 0;
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.toc-card :deep(.widget-content) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0;
+}
+
 .toc-card :deep(.n-anchor) {
+    box-sizing: border-box;
     max-width: none;
+    width: 100%;
+    overflow: hidden;
+}
+
+.toc-card :deep(.n-anchor--block) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 2px;
+}
+
+.toc-card :deep(.n-anchor > .n-anchor-link) {
+    overflow: hidden;
+}
+
+.toc-card :deep(.n-anchor-link) {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    margin-bottom: 0;
+    padding: 0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.toc-card :deep(.n-anchor-link .n-anchor-link) {
+    margin-top: 2px;
+    margin-left: 0;
+    max-width: 100%;
+}
+
+.toc-card :deep(.n-anchor-link--active) {
+    background-color: rgba(22, 119, 255, 0.08) !important;
+    box-shadow: none;
 }
 
 .toc-card :deep(.n-anchor-link__title) {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 5px 10px;
+    border-radius: 6px;
+    color: #111827;
     white-space: normal;
-    line-height: 1.45;
+    line-height: 1.35;
+    overflow: hidden;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.toc-card :deep(.n-anchor-link__title:hover),
+.toc-card :deep(.n-anchor-link__title:focus) {
+    color: #111827 !important;
+}
+
+.toc-card :deep(.n-anchor-link--active > .n-anchor-link__title) {
+    color: #111827;
+    font-weight: 600;
+}
+
+.toc-card :deep(.n-anchor-link .n-anchor-link .n-anchor-link__title) {
+    padding-left: 26px;
+    font-size: 13px;
+}
+
+.toc-card :deep(.n-anchor-link__title::before) {
+    content: '';
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #94a3b8;
+}
+
+.toc-card :deep(.n-anchor-link--active > .n-anchor-link__title::before) {
+    background: #1677ff;
 }
 
 @media (max-width: 1200px) {
@@ -633,11 +773,6 @@ onMounted(() => {
     .article-layout.has-history,
     .article-layout.has-toc.has-history {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-areas:
-            'header'
-            'toc'
-            'main'
-            'history';
     }
 
     .sidebar-left,
@@ -645,9 +780,14 @@ onMounted(() => {
         min-width: 0;
     }
 
-    .toc-card,
+    .sidebar-left,
     .version-card {
         position: static;
+        max-height: none;
+    }
+
+    .toc-card {
+        max-height: none;
     }
 }
 
@@ -660,11 +800,17 @@ onMounted(() => {
 .info-item {
     background: linear-gradient(180deg, #f8fbff, #f3f8ff);
     padding: 10px 12px;
-    border-radius: 12px;
+    border-radius: 6px;
     border: 1px solid rgba(22, 119, 255, 0.08);
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
 }
 
 .label {
@@ -696,6 +842,24 @@ onMounted(() => {
     line-height: 1.6;
     margin-bottom: 8px;
 }
+
+.empty-recommendation {
+    color: #64748b;
+    font-size: 14px;
+}
+
+.version-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@media (max-width: 640px) {
+    .info-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .article-meta {
     display: flex;
     justify-content: space-between;

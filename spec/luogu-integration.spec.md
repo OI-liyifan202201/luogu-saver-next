@@ -167,8 +167,52 @@ interface UserSummary {
     uid: number;
     name: string;
     color: string;
+    ccfLevel: number; // OI / CCF certification level, 0 = none
+    xcpcLevel: number; // ICPC / CCPC certification level, 0 = none
+    // ... other fields present in upstream but unused by the saver
 }
 ```
+
+### 5.4 User Profile Fetch
+
+**URL Pattern:** `https://www.luogu.com/user/{uid}`
+
+**Response Structure:** `LentilleDataResponse<UserData>` where the relevant subset is:
+
+```typescript
+{
+    data: {
+        prizes: {
+            prize: {
+                year: number;
+                contest: string;
+                event: string | null;
+                prize: string;
+                score?: number;
+                rank?: number;
+            };
+        }[];
+        user: {
+            uid: number;
+            name: string;
+            color: UserColor;
+            ccfLevel: number;
+            xcpcLevel: number;
+            slogan: string | null;        // short tagline, plain text
+            introduction: string | null;  // long bio in raw Markdown
+            // ... other UserDetails fields
+        };
+    };
+}
+```
+
+Notes:
+
+- The award list lives at `data.prizes` (top-level), not at `data.user.prize`. Each entry is a one-level wrapper `{ prize: LuoguPrize }`; consumers MUST unwrap the inner object before storing.
+- `data.user.prize` exists in Luogu's response but is unrelated to the certified award list and is typically empty for verified users. Do NOT read from it.
+- `data.user.introduction` is raw Markdown; the saver renders it via the shared `renderMarkdown` pipeline before storing.
+
+The saver consumes only the fields above; all other fields are ignored.
 
 ## 6. User Building
 
@@ -180,9 +224,13 @@ Convert Luogu user summary to local User entity:
 {
     id: user.uid,
     name: user.name,
-    color: user.color as UserColor
+    color: user.color as UserColor,
+    ccfLevel: user.ccfLevel ?? 0,
+    xcpcLevel: user.xcpcLevel ?? 0
 }
 ```
+
+`buildUser` MUST NOT include `prizes` or `profileFetchedAt`. Those fields are only written by `ProfileHandler` via `UserService.saveLuoguUserProfile`. See `user-system.spec.md` for the full contract.
 
 ## 7. Task Handlers
 
@@ -240,6 +288,28 @@ Convert Luogu user summary to local User entity:
 5. Save paste to database.
 6. Update task status to COMPLETED.
 
+### 7.3 ProfileHandler
+
+**Task Type:** `save:profile`
+
+**Payload:**
+
+```typescript
+{
+    target: "profile",
+    targetId: string,  // Luogu UID as decimal string
+    metadata: {}
+}
+```
+
+**Processing:** Defined in `user-system.spec.md` Section 5.3. Briefly:
+
+1. Parse `targetId` to a positive integer; reject otherwise.
+2. Fetch `https://www.luogu.com/user/{uid}` with `C3vkMode.MODERN`.
+3. Extract `user` from `response.data.user` and the award list from `response.data.prizes`, unwrapping the inner `prize` object of each entry.
+4. Call `UserService.saveLuoguUserProfile` with the extracted data.
+5. Emit Socket.IO event `user:{uid}:profile-updated`.
+
 ## 8. Invariants
 
 1. All Luogu API requests include the standard headers.
@@ -247,11 +317,14 @@ Convert Luogu user summary to local User entity:
 3. Network timeouts result in retriable errors.
 4. HTTP 401 and parse errors are unrecoverable.
 5. User entities are created/updated before content entities.
+6. `buildUser` propagates `ccfLevel` and `xcpcLevel` from upstream; missing values map to `0`.
+7. The inline `buildUser` path never overwrites `prizes` or `profile_fetched_at`.
 
 ## 9. File Locations
 
 - Fetch utility: `packages/backend/src/utils/fetch.ts`
 - Luogu API helpers: `packages/backend/src/utils/luogu-api.ts`
 - C3VK mode enum: `packages/backend/src/shared/c3vk.ts`
-- Article handler: `packages/backend/src/workers/handlers/task/article.handler.ts`
-- Paste handler: `packages/backend/src/workers/handlers/task/paste.handler.ts`
+- Article handler: `packages/backend/src/workers/handlers/task/save/article.handler.ts`
+- Paste handler: `packages/backend/src/workers/handlers/task/save/paste.handler.ts`
+- Profile handler: `packages/backend/src/workers/handlers/task/save/profile.handler.ts`

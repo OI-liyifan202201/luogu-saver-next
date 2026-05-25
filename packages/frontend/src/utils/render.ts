@@ -47,6 +47,18 @@ export function hexToRgba(hex: string, alphaOverride?: number): string {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-export const formatDate = (timestamp: string) => {
+export const formatDate = (timestamp: string | number | Date) => {
     return new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
 };
+
+export function renderSafeMarkedHtml(value: string | undefined, fallback: string = '') {
+    const raw = value || fallback;
+    const escaped = raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    return escaped.replace(/&lt;mark&gt;/g, '<mark>').replace(/&lt;\/mark&gt;/g, '</mark>');
+}

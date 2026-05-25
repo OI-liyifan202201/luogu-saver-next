@@ -19,6 +19,7 @@ Table name: `paste`
 | `created_at`    | DATETIME     | NOT NULL                | Record creation timestamp |
 | `updated_at`    | DATETIME     | NOT NULL                | Record update timestamp   |
 | `delete_reason` | VARCHAR      | DEFAULT '管理员删除'    | Reason for deletion       |
+| `content_hash`  | VARCHAR      | NULLABLE                | SHA-256 hash of content   |
 
 ### 2.2 Indexes
 
@@ -53,6 +54,28 @@ Get total count of non-deleted pastes.
 
 - 200: `{ count: number }`
 - 500: Server error
+
+### 3.3 POST /workflow/create/template/paste-save-pipeline
+
+Create a workflow that saves one Luogu paste.
+
+Input body:
+
+```json
+{
+    "targetId": "paste_id"
+}
+```
+
+Postconditions:
+
+1. If `targetId` is absent or empty, workflow creation SHALL fail.
+2. The template SHALL be public and require no authentication.
+3. The workflow SHALL contain one reported task named `save` with type `save`, target `paste`, and `targetId` equal to the input `targetId`.
+4. The workflow MAY contain content safety tasks for the saved paste.
+5. The workflow SHALL NOT contain an LLM task with target `summary`.
+6. The workflow SHALL NOT contain an LLM task with target `embedding`.
+7. The workflow SHALL NOT contain an update task with target `search_index`.
 
 ## 4. Service Layer
 
@@ -91,12 +114,32 @@ When a cached read method receives a manager argument, it SHALL bypass Redis cac
 2. Evict cache keys: `paste:${paste.id}`, `paste:count`.
 3. Return the saved paste.
 
+#### saveLuoguPaste(data: LuoguPaste, forceUpdate = false): Promise<{ skipped: boolean; content: string }>
+
+1. Compute `SHA-256(data.data)`.
+2. If a paste with `id=data.id` exists, `forceUpdate=false`, and `content_hash` equals the computed hash, return `{ skipped: true, content: "" }` without updating the database.
+3. Otherwise upsert a paste row with `id=data.id`, `content=data.data`, `author_id=data.user.uid`, `content_hash` equal to the computed hash, and `deleted=false` for newly inserted rows.
+4. Return `{ skipped: false, content }` where `content` equals the saved paste content.
+
 ## 5. Content Rendering
 
 The `paste.renderContent()` method:
 
 1. If `content` is non-empty, render Markdown to HTML using the `renderMarkdown` library.
 2. Store the result in `paste.renderedContent`.
+3. The paste renderer SHALL NOT generate a table of contents for the response.
+
+### 5.1 Save Task Behavior
+
+The `save:paste` task SHALL:
+
+1. Fetch `https://www.luogu.com/paste/{targetId}`.
+2. Upsert the Luogu paste author before saving the paste.
+3. Save the paste through `PasteService.saveLuoguPaste`.
+4. If `saveLuoguPaste` returns `skipped=true`, return `skipNextStep=true` and `data.text=""`.
+5. If `saveLuoguPaste` returns `skipped=false`, emit websocket event `paste:{id}:updated` to room `paste_{id}`.
+6. If saved content is empty, return `skipNextStep=true` and `data.text=""`.
+7. If saved content is non-empty, return `skipNextStep=false` and `data.text` equal to saved content.
 
 ## 6. Soft Deletion
 

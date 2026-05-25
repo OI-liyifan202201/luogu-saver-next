@@ -16,7 +16,7 @@ import type { PlazaArticle } from '@/types/article';
 import Card from '@/components/Card.vue';
 import CardTitle from '@/components/CardTitle.vue';
 import UserLink from '@/components/UserLink.vue';
-import { ARTICLE_CATEGORIES } from '@/utils/constants';
+import { getCategoryColor, getCategoryIcon, getCategoryLabel } from '@/utils/article.ts';
 import { hexToRgba } from '@/utils/render.ts';
 
 const router = useRouter();
@@ -87,21 +87,6 @@ onUnmounted(() => {
     if (observer) observer.disconnect();
 });
 
-const getCategoryLabel = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].label;
-    return ARTICLE_CATEGORIES[9]!.label;
-};
-
-const getCategoryColor = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].color;
-    return ARTICLE_CATEGORIES[9]!.color;
-};
-
-const getCategoryIcon = (id?: number) => {
-    if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].icon;
-    return ARTICLE_CATEGORIES[9]!.icon;
-};
-
 const goToDetail = (id: string) => {
     const route = router.resolve({ path: `/article/${id}` });
     const newWin = window.open(route.href, '_blank');
@@ -111,7 +96,7 @@ const goToDetail = (id: string) => {
 
 <template>
     <div class="plaza-page">
-        <CardTitle title="文章广场" :icon="GlobeOutline" class="feed-header">
+        <CardTitle title="文章广场" :icon="GlobeOutline" class="feed-header" chip="PLAZA">
             ARTICLE PLAZA!
         </CardTitle>
 
@@ -154,40 +139,51 @@ const goToDetail = (id: string) => {
                                 猜你想看
                             </n-tag>
                         </template>
-                        <div class="article-summary">{{ article.summary || '暂无预览...' }}...</div>
-
-                        <n-divider style="margin: 12px 0" />
-
-                        <div class="article-meta">
-                            <div class="left">
-                                <UserLink :user="article.author" show-avatar />
-                                <n-tag
-                                    :color="{
-                                        textColor: getCategoryColor(article.category),
-                                        color: hexToRgba(getCategoryColor(article.category), 0.2),
-                                        borderColor: getCategoryColor(article.category)
-                                    }"
-                                    size="small"
-                                >
-                                    <template #icon>
-                                        <n-icon :component="getCategoryIcon(article.category)" />
-                                    </template>
-                                    {{ getCategoryLabel(article.category) }}
-                                </n-tag>
+                        <div class="article-card-body">
+                            <div class="article-summary">
+                                {{ article.summary || '暂无预览...' }}...
                             </div>
-                            <div class="right">
-                                <n-button
-                                    text
-                                    size="small"
-                                    type="primary"
-                                    @click.stop="goToDetail(article.id)"
-                                >
-                                    阅读全文
-                                    <n-icon
-                                        :component="ArrowForwardOutline"
-                                        style="margin-left: 4px"
-                                    />
-                                </n-button>
+
+                            <div class="article-meta-wrap">
+                                <n-divider style="margin: 12px 0" />
+
+                                <div class="article-meta">
+                                    <div class="left">
+                                        <UserLink :user="article.author" show-avatar />
+                                        <n-tag
+                                            :color="{
+                                                textColor: getCategoryColor(article.category),
+                                                color: hexToRgba(
+                                                    getCategoryColor(article.category),
+                                                    0.2
+                                                ),
+                                                borderColor: getCategoryColor(article.category)
+                                            }"
+                                            size="small"
+                                        >
+                                            <template #icon>
+                                                <n-icon
+                                                    :component="getCategoryIcon(article.category)"
+                                                />
+                                            </template>
+                                            {{ getCategoryLabel(article.category) }}
+                                        </n-tag>
+                                    </div>
+                                    <div class="right">
+                                        <n-button
+                                            text
+                                            size="small"
+                                            type="primary"
+                                            @click.stop="goToDetail(article.id)"
+                                        >
+                                            阅读全文
+                                            <n-icon
+                                                :component="ArrowForwardOutline"
+                                                style="margin-left: 4px"
+                                            />
+                                        </n-button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </Card>
@@ -243,6 +239,21 @@ const goToDetail = (id: string) => {
 
 .article-item :deep(.saver-card) {
     width: 100%;
+}
+
+.article-item :deep(.card-content) {
+    display: flex;
+    flex: 1;
+}
+
+.article-card-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.article-meta-wrap {
+    margin-top: auto;
 }
 
 .clickable-card {

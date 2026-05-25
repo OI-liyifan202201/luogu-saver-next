@@ -29,8 +29,9 @@ export interface AiTask extends CommonTask {
     type: TaskType.LLM;
     payload: {
         target: 'summary' | 'embedding' | 'chat';
-        sourceId?: string;
-        metadata: Record<string, never>;
+        metadata: {
+            query?: string;
+        };
     };
 }
 
@@ -40,6 +41,45 @@ export interface UpdateTask extends CommonTask {
         target: UpdateTarget;
         targetId: string;
         metadata: Record<string, any>;
+    };
+}
+
+export interface SearchTask extends CommonTask {
+    type: TaskType.SEARCH;
+    payload: {
+        target: SearchTarget;
+        query?: string;
+        metadata: {
+            limit?: number;
+            rawLimit?: number;
+            category?: number;
+            authorId?: number;
+        };
+    };
+}
+
+export interface ReadTask extends CommonTask {
+    type: TaskType.READ;
+    payload: {
+        target: ReadTarget;
+        targetId?: string;
+        metadata: {
+            text?: string;
+            queryIndex?: number;
+        };
+    };
+}
+
+export interface RagTask extends CommonTask {
+    type: TaskType.RAG;
+    payload: {
+        target: RagTarget;
+        query?: string;
+        metadata: {
+            maxArticles?: number;
+            maxChars?: number;
+            articleIds?: string[];
+        };
     };
 }
 
@@ -53,19 +93,29 @@ export enum TaskStatus {
 export enum TaskType {
     SAVE = 'save',
     LLM = 'llm',
-    UPDATE = 'update'
+    UPDATE = 'update',
+    SEARCH = 'search',
+    READ = 'read',
+    RAG = 'rag'
 }
 
 export type TaskDefinition = {
     [TaskType.SAVE]: SaveTask;
     [TaskType.LLM]: AiTask;
     [TaskType.UPDATE]: CommonTask;
+    [TaskType.SEARCH]: SearchTask;
+    [TaskType.READ]: ReadTask;
+    [TaskType.RAG]: RagTask;
 };
 
 export enum UpdateTarget {
     ARTICLE_SUMMARY = 'article_summary',
+    ARTICLE_SUMMARY_REBUILD = 'article_summary_rebuild',
     ARTICLE_EMBEDDING = 'article_embedding',
-    CENSOR = 'censor'
+    ARTICLE_EMBEDDING_REBUILD = 'article_embedding_rebuild',
+    CENSOR = 'censor',
+    SEARCH_INDEX = 'search_index',
+    SEARCH_REINDEX = 'search_reindex'
 }
 
 export enum SaveTarget {
@@ -75,6 +125,24 @@ export enum SaveTarget {
     JUDGEMENT = 'judgement',
     PROFILE = 'profile',
     COMMENTS = 'comments'
+}
+
+export enum SearchTarget {
+    ARTICLE = 'article',
+    VECTOR = 'vector'
+}
+
+export enum ReadTarget {
+    TEXT = 'text',
+    PLANNED_QUERY = 'planned_query',
+    ARTICLE = 'article',
+    PASTE = 'paste'
+}
+
+export enum RagTarget {
+    PLAN_QUERIES = 'plan_queries',
+    CONTEXT = 'context',
+    ANSWER = 'answer'
 }
 
 export enum CensorTarget {

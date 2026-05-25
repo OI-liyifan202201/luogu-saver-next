@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inject, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { NIcon, NInput, NButton } from 'naive-ui';
 import { Search, ArrowForward } from '@vicons/ionicons5';
 import { uiThemeKey } from '@/styles/theme/themeKeys.ts';
@@ -7,21 +8,25 @@ import LuoguLogo from '@/components/icons/LuoguLogo.vue';
 
 const themeVars = inject(uiThemeKey)!;
 const searchText = ref('');
+const router = useRouter();
 
 const handleSearch = () => {
     const query = searchText.value.trim();
     if (!query) return;
 
-    if (query.match(/^https?:\/\//) || query.includes('luogu')) {
-        // Link handling
-        console.log('Link detected:', query);
-    } else if (/^\d+$/.test(query)) {
-        // UID handling
-        console.log('UID detected:', query);
-    } else {
-        // Keyword handling
-        console.log('Keyword detected:', query);
+    const articleMatch = query.match(/luogu\.com(?:\.cn)?\/article\/([A-Za-z0-9]+)/);
+    if (articleMatch?.[1]) {
+        router.push(`/article/${articleMatch[1]}`);
+        return;
     }
+
+    const articleIdMatch = query.match(/^([A-Za-z0-9]{8})$/);
+    if (articleIdMatch?.[1]) {
+        router.push(`/article/${articleIdMatch[1]}`);
+        return;
+    }
+
+    router.push({ path: '/search', query: { q: query } });
 };
 </script>
 
@@ -39,16 +44,18 @@ const handleSearch = () => {
                     </h1>
                 </div>
                 <p class="hero-subtitle">Save everything, keep it alive.</p>
+                <!--
                 <p class="hero-description">
-                    面向洛谷内容的保存、检索与推荐入口。保留熟悉的轻量风格，升级为更清晰的极客蓝信息台。
+                
                 </p>
+                -->
 
                 <div class="hero-search">
                     <n-input
                         v-model:value="searchText"
                         class="mac-input"
                         size="large"
-                        placeholder="输入链接/文章标题或关键词/uid 查看"
+                        placeholder="&nbsp;&nbsp;&nbsp输入链接、文章标题、文章 ID、关键词或作者用户名查看"
                         @keydown.enter="handleSearch"
                     >
                         <template #prefix>
@@ -96,7 +103,7 @@ const handleSearch = () => {
     padding: 48px;
     position: relative;
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: 6px;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 252, 0.92));
     border: 1px solid rgba(47, 109, 181, 0.1);
     box-shadow: 0 14px 32px rgba(47, 109, 181, 0.07);
@@ -120,7 +127,7 @@ const handleSearch = () => {
     display: inline-flex;
     padding: 7px 12px;
     margin-bottom: 18px;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #2f6db5;
     background: rgba(47, 109, 181, 0.08);
     border: 1px solid rgba(47, 109, 181, 0.12);
@@ -142,7 +149,7 @@ const handleSearch = () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 14px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.86);
     box-shadow: none;
     border: 1px solid rgba(47, 109, 181, 0.1);
@@ -185,7 +192,7 @@ const handleSearch = () => {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(22, 119, 255, 0.14) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
     box-shadow: 0 10px 24px rgba(47, 109, 181, 0.08);
     height: 58px;
     font-size: 18px;
@@ -225,7 +232,7 @@ const handleSearch = () => {
 
 .panel-card {
     padding: 16px;
-    border-radius: 12px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.72);
     border: 1px solid rgba(47, 109, 181, 0.1);
 }
@@ -261,7 +268,7 @@ const handleSearch = () => {
 @media (max-width: 640px) {
     .hero-section {
         padding: 30px 18px;
-        border-radius: 14px;
+        border-radius: 6px;
     }
 
     .brand-header {

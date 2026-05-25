@@ -16,12 +16,43 @@ The `EmbeddingService` interfaces with ChromaDB for vector-based similarity sear
 2. Query Chroma collection for the article's embedding.
 3. Return the embedding vector or null if not found.
 
-#### getNearestVectors(embedding: number[], n: number): Promise<QueryResult>
+#### getNearestVectors(embedding: number[], n: number, where?): Promise<QueryResult>
 
 1. If Chroma is disabled, return empty results `{ ids: [[]], distances: [[]] }`.
 2. If embedding is empty, return empty results.
 3. Query Chroma for n nearest neighbors.
-4. Return IDs and distances.
+4. If `where` is provided, pass it to Chroma as a metadata filter.
+5. Return IDs and distances.
+
+#### getNearestArticleCandidates(embedding, distinctArticleLimit, rawVectorLimit)
+
+1. Query Chroma for at most `rawVectorLimit` summary and chunk vectors.
+2. Fold vector hits by metadata `articleId`; if metadata is absent, use the prefix before `:chunk:` or the whole vector ID.
+3. For each article, keep the vector hit with the maximum score `max(0, 1 - distance)`.
+4. Return at most `distinctArticleLimit` distinct articles sorted by descending vector score.
+5. Each returned hit SHALL include `id`, `score`, `distance`, `vectorId`, `vectorKind`, and optional `chunkIndex`, `chunkStart`, `chunkEnd`, and `chunkText`.
+
+#### upsertVector(id, metadata, document, embedding)
+
+1. If Chroma is disabled, perform no write.
+2. If Chroma is enabled, upsert one vector with the provided `id`, `metadata`, `document`, and `embedding`.
+
+#### upsertArticleEmbeddings(article, summaryEmbedding?, chunkEmbeddings?)
+
+1. Delete existing chunk vectors for `article.id`.
+2. Upsert one summary vector with ID equal to `article.id`, metadata `articleId=article.id`, and metadata `kind="summary"`.
+3. Split `article.content` into chunks of `config.rag.chunkSize` characters with `config.rag.chunkOverlap` overlap.
+4. Upsert one chunk vector per chunk with ID `${article.id}:chunk:${index}`, metadata `articleId=article.id`, `kind="chunk"`, `chunkIndex`, `start`, and `end`.
+
+#### rebuildArticleEmbeddings(batchSize = 20, concurrency = 5)
+
+1. Load non-deleted articles in ascending article ID order in batches of `batchSize`.
+2. For each article, generate one summary embedding from `article.summary` if non-empty after trimming; otherwise from `article.content`.
+3. For each article, split `article.content` into chunks of 4000 characters with 300 characters overlap and generate one embedding per chunk.
+4. Upsert all generated summary and chunk vectors into Chroma with article metadata `{ title, authorId, category, tags }` plus vector-level metadata.
+5. Process at most `concurrency` articles at the same time inside each batch.
+6. Continue after per-article failures.
+7. Return `{ processed, updated, failed, failedArticleIds }`.
 
 ### 2.2 Recommendation Service
 

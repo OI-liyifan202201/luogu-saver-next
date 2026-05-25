@@ -33,6 +33,7 @@ export function initSocket(
 
         socket.on('leave', (room: string) => {
             socket.leave(room);
+            socket.emit(`leave:${room}`);
             logger.info({ id: socket.id, room }, 'Client left room');
         });
 

@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { config } from '@/config';
 import { logger } from '@/lib/logger';
 
-export type LLMScenario = 'chat' | 'summary' | 'embedding' | 'censor';
+export type LLMScenario = 'chat' | 'summary' | 'answer' | 'embedding' | 'rerank' | 'censor';
 
 export interface LLMResponse {
     content?: string | null;
@@ -14,6 +14,16 @@ export interface EmbeddingResponse {
     embedding: number[];
     usage?: OpenAI.Embeddings.CreateEmbeddingResponse.Usage;
     raw: OpenAI.Embeddings.CreateEmbeddingResponse;
+}
+
+export interface RerankResult {
+    index: number;
+    relevanceScore: number;
+}
+
+export interface RerankResponse {
+    results: RerankResult[];
+    raw: any;
 }
 
 class LLMService {
@@ -60,10 +70,20 @@ class LLMService {
             use = scenarios.summary.use;
             modelParams = {
                 temperature: scenarios.summary.temperature,
-                max_tokens: scenarios.summary.maxTokens
+                max_tokens: scenarios.summary.maxTokens,
+                top_p: scenarios.summary.topP
+            };
+        } else if (scenario === 'answer') {
+            use = scenarios.answer?.use || scenarios.chat.use;
+            modelParams = {
+                temperature: scenarios.answer.temperature,
+                max_tokens: scenarios.answer.maxTokens,
+                top_p: scenarios.answer.topP
             };
         } else if (scenario === 'embedding') {
             use = scenarios.embedding.use;
+        } else if (scenario === 'rerank') {
+            use = scenarios.rerank?.use || '';
         } else if (scenario === 'censor') {
             use = scenarios.censor.use;
         } else {
@@ -105,7 +125,7 @@ class LLMService {
 
     public async chat(
         messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-        scenario: 'chat' | 'summary' | 'censor' = 'chat'
+        scenario: 'chat' | 'summary' | 'answer' | 'censor' = 'chat'
     ): Promise<LLMResponse> {
         const { providerId, modelId, modelParams } = this.getContext(scenario);
         const client = this.getClient(providerId);
@@ -151,6 +171,52 @@ class LLMService {
             logger.error({ error, providerId, modelId }, 'LLM embedding failed');
             throw error;
         }
+    }
+
+    public hasRerank(): boolean {
+        return Boolean(config.llm.scenarios.rerank?.use);
+    }
+
+    public async rerank(
+        query: string,
+        documents: string[],
+        topN: number = documents.length
+    ): Promise<RerankResponse> {
+        const { providerId, modelId } = this.getContext('rerank');
+        const client = this.getClient(providerId);
+
+        logger.debug({ providerId, modelId, documents: documents.length }, 'Starting LLM rerank');
+
+        try {
+            const payload = await client.post<any>('/rerank', {
+                body: {
+                    model: modelId!,
+                    query,
+                    documents,
+                    top_n: topN,
+                    return_documents: false,
+                    temperature: config.llm.scenarios.rerank.temperature,
+                    top_p: config.llm.scenarios.rerank.topP
+                }
+            });
+            return {
+                results: this.normalizeRerankResults(payload?.results),
+                raw: payload
+            };
+        } catch (error) {
+            logger.error({ error, providerId, modelId }, 'LLM rerank failed');
+            throw error;
+        }
+    }
+
+    private normalizeRerankResults(results: any): RerankResult[] {
+        if (!Array.isArray(results)) return [];
+        return results
+            .map(item => ({
+                index: Number(item?.index),
+                relevanceScore: Number(item?.relevance_score ?? item?.relevanceScore ?? 0)
+            }))
+            .filter(item => Number.isInteger(item.index) && Number.isFinite(item.relevanceScore));
     }
 }
 

@@ -26,8 +26,16 @@ const props = defineProps({
     hoverable: {
         type: Boolean,
         default: false
+    },
+    titleHtml: {
+        type: String,
+        default: null
     }
 });
+
+const emit = defineEmits<{
+    click: [event: MouseEvent];
+}>();
 
 const effectiveIconColor = computed(() => {
     return props.iconColor || themeVars.value.primaryColor;
@@ -40,17 +48,23 @@ const effectiveBackgroundColor = computed(() => {
 const cardStyle = computed(
     (): CSSProperties => ({
         backgroundColor: effectiveBackgroundColor.value,
-        boxShadow: themeVars.value.cardShadow
+        boxShadow: themeVars.value.cardShadow,
+        borderRadius: themeVars.value.cardRadius
     })
 );
 
 const showHeader = computed(() => {
-    return !!props.title || !!slots['header-extra'];
+    return !!props.title || !!props.titleHtml || !!slots['header-extra'];
 });
 </script>
 
 <template>
-    <div class="saver-card" :class="{ 'is-hoverable': hoverable }" :style="cardStyle">
+    <div
+        class="saver-card"
+        :class="{ 'is-hoverable': hoverable }"
+        :style="cardStyle"
+        @click="event => emit('click', event)"
+    >
         <div v-if="showHeader" class="card-header">
             <div class="card-title-wrapper">
                 <n-icon
@@ -61,11 +75,18 @@ const showHeader = computed(() => {
                     :depth="1"
                 />
                 <span
-                    v-if="title"
+                    v-if="titleHtml"
                     class="card-title"
                     :style="{ color: themeVars.cardTitleColor }"
-                    >{{ title }}</span
+                    v-html="titleHtml"
+                />
+                <span
+                    v-else-if="title"
+                    class="card-title"
+                    :style="{ color: themeVars.cardTitleColor }"
                 >
+                    {{ title }}
+                </span>
                 <slot name="title-extra" />
             </div>
             <div class="card-extra">
@@ -81,7 +102,6 @@ const showHeader = computed(() => {
 <style scoped>
 .saver-card {
     padding: 20px;
-    border-radius: 12px;
     border: 1px solid rgba(47, 109, 181, 0.08);
     transition:
         transform 0.3s ease,
@@ -116,7 +136,7 @@ const showHeader = computed(() => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 6px;
     background: rgba(47, 109, 181, 0.08);
 }
 
@@ -128,5 +148,12 @@ const showHeader = computed(() => {
 
 .card-content {
     flex: 1;
+}
+
+:deep(mark) {
+    padding: 0 2px;
+    border-radius: 3px;
+    background: rgba(47, 109, 181, 0.14);
+    color: inherit;
 }
 </style>

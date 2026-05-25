@@ -7,6 +7,7 @@ import { PasteService } from '@/services/paste.service';
 import { buildUser } from '@/utils/luogu-api';
 import { UserService } from '@/services/user.service';
 import { logger } from '@/lib/logger';
+import { emitToRoom } from '@/lib/socket';
 
 export class PasteHandler implements TaskHandler<SaveTask> {
     public taskType = 'save:paste';
@@ -27,6 +28,17 @@ export class PasteHandler implements TaskHandler<SaveTask> {
 
         if (saveResult.skipped) {
             logger.info({ pasteId: data.id }, 'Paste content unchanged, skipping update');
+            return {
+                skipNextStep: true,
+                data: {
+                    text: ''
+                }
+            };
+        }
+
+        emitToRoom(`paste_${data.id}`, `paste:${data.id}:updated`);
+
+        if (!saveResult.content) {
             return {
                 skipNextStep: true,
                 data: {

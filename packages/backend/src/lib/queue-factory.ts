@@ -27,6 +27,10 @@ export function getQueueByName(queueName: string): TypedQueue<any> {
     return getOrCreateQueue<any>(queueName);
 }
 
+export function getQueuePoolSize(): number {
+    return queuePool.size;
+}
+
 export async function closeAllQueues() {
     logger.info(`Closing ${queuePool.size} active queues...`);
     const closePromises = [];

@@ -64,7 +64,28 @@ The configuration is validated using Zod schemas. All fields have default values
 | `port`           | number  | 8000           | Chroma server port            |
 | `collectionName` | string  | "lgs_articles" | Chroma collection name        |
 
-### 3.5 Recommendation Configuration (`recommendation`)
+### 3.4.1 RAG Retrieval Configuration (`rag`)
+
+| Field                   | Type   | Default | Description                               |
+| ----------------------- | ------ | ------- | ----------------------------------------- |
+| `chunkSize`             | number | 4000    | Article content chunk length in chars     |
+| `chunkOverlap`          | number | 300     | Adjacent chunk overlap length in chars    |
+| `candidateArticleLimit` | number | 100     | Distinct article candidates before rerank |
+| `rawVectorResultLimit`  | number | 500     | Raw Chroma vector hits before folding     |
+| `keywordWeight`         | number | 0.25    | Keyword retrieval score weight            |
+| `vectorWeight`          | number | 0.35    | Vector retrieval score weight             |
+| `rerankWeight`          | number | 0.4     | Rerank score weight                       |
+
+### 3.5 Meilisearch Configuration (`meilisearch`)
+
+| Field              | Type    | Default                 | Description                    |
+| ------------------ | ------- | ----------------------- | ------------------------------ |
+| `enable`           | boolean | false                   | Enable Meilisearch integration |
+| `host`             | string  | "http://127.0.0.1:7700" | Meilisearch server URL         |
+| `apiKey`           | string  | ""                      | Meilisearch API key            |
+| `articleIndexName` | string  | "lgs_articles"          | Article index name             |
+
+### 3.6 Recommendation Configuration (`recommendation`)
 
 | Field                  | Type   | Default         | Description                                            |
 | ---------------------- | ------ | --------------- | ------------------------------------------------------ |
@@ -74,7 +95,7 @@ The configuration is validated using Zod schemas. All fields have default values
 | `decayFactor`          | number | 0.9             | Decay factor for weighted profile vector calculation   |
 | `relevantThreshold`    | number | 0.75            | Minimum string similarity for title-based matching     |
 
-### 3.6 Queue Configuration (`queue`)
+### 3.7 Queue Configuration (`queue`)
 
 | Field                  | Type   | Default | Description                             |
 | ---------------------- | ------ | ------- | --------------------------------------- |
@@ -84,6 +105,28 @@ The configuration is validated using Zod schemas. All fields have default values
 | `regenerationInterval` | number | 1000    | Token regeneration interval in ms       |
 | `maxQueueLength`       | number | 1000    | Maximum pending jobs in queue           |
 | `processInterval`      | number | 100     | Job processing interval in ms           |
+
+### 3.8 LLM Rerank Scenario
+
+`llm.scenarios.rerank.use` is optional.
+
+If absent or empty, RAG candidate reranking SHALL be skipped.
+
+If present, the configured provider/model SHALL be called with the standard rerank API shape.
+
+### 3.9 LLM Scenario Parameters
+
+| Scenario  | Field         | Default    | Description                         |
+| --------- | ------------- | ---------- | ----------------------------------- |
+| `chat`    | `temperature` | 0.7        | Default chat sampling temperature   |
+| `chat`    | `topP`        | 0.95       | Default chat nucleus sampling value |
+| `summary` | `temperature` | 0.2        | Summary sampling temperature        |
+| `summary` | `topP`        | 0.9        | Summary nucleus sampling value      |
+| `answer`  | `use`         | `chat.use` | RAG final answer provider/model     |
+| `answer`  | `temperature` | 0.3        | RAG final answer temperature        |
+| `answer`  | `topP`        | 0.9        | RAG final answer top-p              |
+| `rerank`  | `temperature` | 0          | Rerank request temperature          |
+| `rerank`  | `topP`        | 1.0        | Rerank request top-p                |
 
 ## 4. Loading Behavior
 
