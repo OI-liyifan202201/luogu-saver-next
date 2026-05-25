@@ -991,6 +991,10 @@ export interface ReplySummary {
     time: number;
 }
 
+export interface RepliesData {
+    replySlice: Reply[];
+}
+
 export interface Reply extends ReplySummary {
     content: string;
 }

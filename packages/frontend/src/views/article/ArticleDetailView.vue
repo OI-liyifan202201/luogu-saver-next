@@ -45,6 +45,7 @@ import Card from '@/components/Card.vue';
 import SidebarWidget from '@/components/SidebarWidget.vue';
 import UserLink from '@/components/UserLink.vue';
 import MarkdownViewer from '@/components/MarkdownViewer.vue';
+import ArticleComments from '@/components/ArticleComments.vue';
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue';
 import { ARTICLE_CATEGORIES, CACHE_STORAGE_KEY, UNKNOWN_CATEGORY } from '@/utils/constants';
 import { formatDate } from '@/utils/render';
@@ -420,6 +421,10 @@ onMounted(() => {
                             <MarkdownViewer :content="displayContent" />
                         </Card>
                     </LoadingSkeleton>
+
+                    <div v-if="article" style="margin-top: 20px">
+                        <ArticleComments :article-id="article.id" />
+                    </div>
                 </div>
 
                 <div style="margin-top: 20px">

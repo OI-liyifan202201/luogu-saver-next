@@ -73,7 +73,8 @@ export enum SaveTarget {
     PASTE = 'paste',
     BENBEN = 'benben',
     JUDGEMENT = 'judgement',
-    PROFILE = 'profile'
+    PROFILE = 'profile',
+    COMMENTS = 'comments'
 }
 
 export enum CensorTarget {
