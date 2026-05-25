@@ -3,12 +3,20 @@ import { RagTask } from '@/shared/task';
 import { ChildrenValues, TaskCommonResult, TaskHandler, WorkflowResult } from '@/workers/types';
 import { ArticleService } from '@/services/article.service';
 import { clampInt } from '@/utils/number';
+import { llm } from '@/lib/llm';
+import { logger } from '@/lib/logger';
+import { config } from '@/config';
 
 type MergedHit = {
     id: string;
     score: number;
+    keywordScore?: number;
+    vectorScore?: number;
+    rerankScore?: number;
     keywordRank?: number;
     vectorDistance?: number;
+    chunkText?: string;
+    chunkIndex?: number;
     sources: string[];
     queries: string[];
 };
@@ -23,6 +31,11 @@ type RagDocument = {
     sources: string[];
     queries: string[];
     vectorDistance?: number;
+    keywordScore?: number;
+    vectorScore?: number;
+    rerankScore?: number;
+    chunkText?: string;
+    chunkIndex?: number;
 };
 
 export class RagContextHandler implements TaskHandler<RagTask> {
@@ -56,27 +69,27 @@ export class RagContextHandler implements TaskHandler<RagTask> {
             includedIds.add(document.id);
         }
 
-        const merged = this.mergeHits(childrenValues).filter(hit => !includedIds.has(hit.id));
+        const merged = (await this.mergeHits(question, childrenValues)).filter(
+            hit => !includedIds.has(hit.id)
+        );
         for (const hit of merged) {
             if (documents.length >= maxArticles) break;
-            const article = await ArticleService.getArticleByIdWithAuthorWithoutCache(hit.id);
-            if (!article || article.deleted) continue;
-            documents.push({
-                id: article.id,
-                title: article.title,
-                summary: article.summary || '',
-                excerpt: this.truncate(article.content || '', 900),
-                authorName: article.author?.name || '',
-                score: hit.score,
-                sources: hit.sources,
-                queries: hit.queries,
-                vectorDistance: hit.vectorDistance
-            });
+            const document = await this.loadArticleDocument(hit.id, hit);
+            if (!document) continue;
+            documents.push(document);
         }
 
         let text = `<question>\n${question}\n</question>\n<documents>\n`;
         for (const doc of documents) {
-            const candidate = `<document id="${doc.id}" title="${this.escapeAttr(doc.title)}" source="${doc.sources.join(',')}" queries="${this.escapeAttr(doc.queries.join(' | '))}">\n<summary>${doc.summary}</summary>\n<excerpt>${doc.excerpt}</excerpt>\n</document>\n`;
+            const matchedChunk = doc.chunkText
+                ? `<matched_chunk index="${doc.chunkIndex ?? ''}">${doc.chunkText}</matched_chunk>\n`
+                : '';
+            const candidate = `<document id="${doc.id}" title="${this.escapeAttr(doc.title)}" source="${doc.sources.join(',')}" queries="${this.escapeAttr(doc.queries.join(' | '))}">
+<summary>${doc.summary}</summary>
+${matchedChunk}<score keyword="${doc.keywordScore ?? 0}" vector="${doc.vectorScore ?? 0}" rerank="${doc.rerankScore ?? 0}">${doc.score}</score>
+<excerpt>${doc.excerpt}</excerpt>
+</document>
+`;
             if ((text + candidate + '</documents>').length > maxChars) break;
             text += candidate;
         }
@@ -93,7 +106,18 @@ export class RagContextHandler implements TaskHandler<RagTask> {
 
     private async loadArticleDocument(
         articleId: string,
-        hit: Pick<MergedHit, 'score' | 'sources' | 'queries' | 'vectorDistance'>
+        hit: Pick<
+            MergedHit,
+            | 'score'
+            | 'sources'
+            | 'queries'
+            | 'vectorDistance'
+            | 'keywordScore'
+            | 'vectorScore'
+            | 'rerankScore'
+            | 'chunkText'
+            | 'chunkIndex'
+        >
     ): Promise<RagDocument | null> {
         const article = await ArticleService.getArticleByIdWithAuthorWithoutCache(articleId);
         if (!article || article.deleted) return null;
@@ -106,7 +130,12 @@ export class RagContextHandler implements TaskHandler<RagTask> {
             score: hit.score,
             sources: hit.sources,
             queries: hit.queries,
-            vectorDistance: hit.vectorDistance
+            vectorDistance: hit.vectorDistance,
+            keywordScore: hit.keywordScore,
+            vectorScore: hit.vectorScore,
+            rerankScore: hit.rerankScore,
+            chunkText: hit.chunkText,
+            chunkIndex: hit.chunkIndex
         };
     }
 
@@ -133,7 +162,10 @@ export class RagContextHandler implements TaskHandler<RagTask> {
         return (fallback || '').trim();
     }
 
-    private mergeHits(childrenValues: ChildrenValues): MergedHit[] {
+    private async mergeHits(
+        question: string,
+        childrenValues: ChildrenValues
+    ): Promise<MergedHit[]> {
         const merged = new Map<string, MergedHit>();
 
         for (const value of Object.values(childrenValues)) {
@@ -145,6 +177,9 @@ export class RagContextHandler implements TaskHandler<RagTask> {
                 const current: MergedHit = merged.get(hit.id) || {
                     id: hit.id,
                     score: 0,
+                    keywordScore: 0,
+                    vectorScore: 0,
+                    rerankScore: 0,
                     sources: [],
                     queries: []
                 };
@@ -154,11 +189,18 @@ export class RagContextHandler implements TaskHandler<RagTask> {
                         typeof hit.score === 'number'
                             ? hit.score
                             : Math.max(0, 1 - (hit.distance || 1));
-                    current.score += vectorScore;
-                    current.vectorDistance = hit.distance;
+                    current.vectorScore = Math.max(current.vectorScore || 0, vectorScore);
+                    if (
+                        current.vectorDistance === undefined ||
+                        hit.distance < current.vectorDistance
+                    ) {
+                        current.vectorDistance = hit.distance;
+                        current.chunkText = hit.chunkText;
+                        current.chunkIndex = hit.chunkIndex;
+                    }
                     if (!current.sources.includes('vector')) current.sources.push('vector');
                 } else {
-                    current.score += 1 / (index + 1);
+                    current.keywordScore = Math.max(current.keywordScore || 0, 1 / (index + 1));
                     current.keywordRank = index;
                     if (!current.sources.includes('keyword')) current.sources.push('keyword');
                 }
@@ -169,12 +211,60 @@ export class RagContextHandler implements TaskHandler<RagTask> {
             });
         }
 
-        for (const hit of merged.values()) {
-            if (hit.sources.includes('keyword') && hit.sources.includes('vector')) hit.score += 0.5;
-            if (hit.queries.length > 1) hit.score += (hit.queries.length - 1) * 0.25;
+        const candidates = [...merged.values()]
+            .sort((a, b) => this.baseScore(b) - this.baseScore(a))
+            .slice(0, config.rag.candidateArticleLimit);
+
+        await this.applyRerank(question, candidates);
+
+        for (const hit of candidates) {
+            hit.score =
+                (hit.keywordScore || 0) * config.rag.keywordWeight +
+                (hit.vectorScore || 0) * config.rag.vectorWeight +
+                (hit.rerankScore || 0) * config.rag.rerankWeight;
+            if (hit.sources.includes('keyword') && hit.sources.includes('vector'))
+                hit.score += 0.05;
+            if (hit.queries.length > 1) hit.score += (hit.queries.length - 1) * 0.025;
         }
 
-        return [...merged.values()].sort((a, b) => b.score - a.score);
+        return candidates.sort((a, b) => b.score - a.score);
+    }
+
+    private baseScore(hit: MergedHit) {
+        return (
+            (hit.keywordScore || 0) * config.rag.keywordWeight +
+            (hit.vectorScore || 0) * config.rag.vectorWeight
+        );
+    }
+
+    private async applyRerank(question: string, candidates: MergedHit[]) {
+        if (!llm.hasRerank() || candidates.length === 0) return;
+
+        const documents = await Promise.all(
+            candidates.map(async hit => {
+                const article = await ArticleService.getArticleByIdWithAuthorWithoutCache(hit.id);
+                if (!article || article.deleted) return '';
+                return [
+                    `标题：${article.title}`,
+                    `摘要：${article.summary || ''}`,
+                    hit.chunkText ? `命中片段：${hit.chunkText}` : '',
+                    `正文开头：${this.truncate(article.content || '', 900)}`
+                ]
+                    .filter(Boolean)
+                    .join('\n');
+            })
+        );
+
+        try {
+            const response = await llm.rerank(question, documents, candidates.length);
+            for (const result of response.results) {
+                const candidate = candidates[result.index];
+                if (!candidate) continue;
+                candidate.rerankScore = Math.max(0, result.relevanceScore);
+            }
+        } catch (error) {
+            logger.warn({ error }, 'RAG rerank failed; falling back to retrieval scores');
+        }
     }
 
     private truncate(text: string, max: number): string {

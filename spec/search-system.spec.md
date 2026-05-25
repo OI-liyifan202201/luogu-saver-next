@@ -169,7 +169,7 @@ Behavior:
 
 1. Use `payload.query` as the search query.
 2. If `payload.query` is absent, use upstream `data.text` from the first father task that returns text.
-3. Use `metadata.limit` as the number of hits. If absent, use 5. Clamp the value to `[1, 20]`.
+3. Use `metadata.limit` as the number of hits. If absent, use 5. Clamp the value to `[1, 100]`.
 4. Use optional `metadata.category` and `metadata.authorId` as filters.
 5. Return `{ hits, total }` where `hits` has the same item shape as `GET /search/articles`.
 6. Set `query` on each hit to the text query used by the task.
@@ -195,9 +195,9 @@ Payload shape:
 Behavior:
 
 1. Read `embedding` from the first father task whose result has `data.embedding` as an array.
-2. Use `metadata.limit` as the number of hits. If absent, use 10. Clamp the value to `[1, 20]`.
-3. Query Chroma by `EmbeddingService.getNearestVectors(embedding, limit)`.
-4. Return `{ hits, total }` where each hit has `{ id, distance, score, source }`.
+2. Use `metadata.limit` as the number of distinct article hits. If absent, use 10. Clamp the value to `[1, 100]`.
+3. Query Chroma by `EmbeddingService.getNearestArticleCandidates(embedding, limit, rawLimit)` where `rawLimit` defaults to 500.
+4. Return `{ hits, total }` where each hit has `{ id, distance, score, source, vectorId, vectorKind }` and may include chunk metadata.
 5. Set `source` to `vector`.
 6. Set `score=max(0, 1 - distance)`.
 7. Set `query` on each hit to the text query used to produce the embedding, if present in the embedding task result.
@@ -215,17 +215,19 @@ Behavior:
 2. Read keyword hits from father results with `data.hits` where hits contain article search fields.
 3. Read vector hits from father results with `data.hits` where hits contain `source='vector'`.
 4. Merge hits by article ID.
-5. Score each ID by:
-    - keyword hit at rank `i`: add `1 / (i + 1)`.
-    - vector hit with distance `d`: add `max(0, 1 - d)`.
-    - if the ID appears in both keyword and vector hits: add `0.5`.
-    - if the ID appears for `n` distinct non-empty query strings and `n > 1`: add `(n - 1) * 0.25`.
-6. Include each distinct non-empty query string in the returned document's `queries` array.
-7. Select at most `metadata.maxArticles` articles. If absent, use 10. Clamp to `[1, 10]`.
-8. Load selected articles from the database.
-9. Build `data.text` as XML-like context containing the question and selected documents.
-10. The total context text SHALL be at most `metadata.maxChars` characters. If absent, use 20000. Clamp to `[1000, 20000]`.
-11. Return `{ text, documents }`.
+5. Fold all hits into at most `config.rag.candidateArticleLimit` distinct article candidates.
+6. Score each candidate using keyword score, vector score, and rerank score.
+7. Keyword score SHALL be normalized from rank as `1 / (rank + 1)`.
+8. Vector score SHALL be `max(0, 1 - distance)` from the best summary or chunk hit for the article.
+9. The handler SHALL call standard rerank API through the LLM rerank scenario when configured.
+10. Final score SHALL be `keywordScore * keywordWeight + vectorScore * vectorWeight + rerankScore * rerankWeight`.
+11. If rerank is not configured or fails, rerankScore SHALL be `0` and candidate ordering SHALL still complete.
+12. Include each distinct non-empty query string in the returned document's `queries` array.
+13. Select at most `metadata.maxArticles` articles. If absent, use 10. Clamp to `[1, 10]`.
+14. Load selected articles from the database.
+15. Build `data.text` as XML-like context containing the question and selected documents.
+16. The total context text SHALL be at most `metadata.maxChars` characters. If absent, use 20000. Clamp to `[1000, 20000]`.
+17. Return `{ text, documents }`.
 
 ### 9.2 `rag:answer`
 
@@ -251,6 +253,7 @@ Return `{ text }` where `text` equals `payload.metadata.text`.
 2. Read `data.queries[i]` from the first father result that contains a `queries` array.
 3. If no query exists at index `i`, return `{ text: '', queryIndex: i }` with `skipNextStep=true`.
 4. If a query exists at index `i`, return `{ text: query, queryIndex: i }` with `skipNextStep=false`.
+5. The value of `query` MAY be a long natural-language retrieval text and SHALL NOT be required to be a short keyword phrase.
 
 ### 10.3 `read:article`
 

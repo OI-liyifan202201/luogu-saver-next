@@ -27,7 +27,7 @@ export class ArticleSearchHandler implements TaskHandler<SearchTask> {
             job.id
         )?.text;
         const query = task.payload.query || upstreamText || '';
-        const limit = clampInt(task.payload.metadata?.limit, 5, 1, 20);
+        const limit = clampInt(task.payload.metadata?.limit, 5, 1, 100);
         const result = await SearchService.searchArticles({
             q: query,
             page: 1,

@@ -1,6 +1,7 @@
 import { TaskDefinition, WorkflowDefinition } from '@/utils/flow-validator';
 import { Permission } from '@/shared/permission';
 import { clampInt } from '@/utils/number';
+import { config } from '@/config';
 
 export type WorkflowTemplateBuilder = (params: any) => WorkflowDefinition;
 
@@ -95,19 +96,8 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
                 }
             },
             {
-                name: 'embedding',
-                fathers: ['summary'],
-                data: {
-                    type: 'llm',
-                    payload: {
-                        target: 'embedding',
-                        metadata: {}
-                    }
-                }
-            },
-            {
                 name: 'update-embedding',
-                fathers: ['embedding'],
+                fathers: ['summary'],
                 data: {
                     type: 'update',
                     payload: {
@@ -265,7 +255,7 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
         const query = String(params?.query || '').trim();
         if (!query) throw new Error('query is required for rag-search-pipeline');
 
-        const limit = clampInt(params?.limit, 10, 1, 20);
+        const limit = clampInt(params?.limit, 100, 1, 100);
         const maxQueries = 5;
         const maxArticles = clampInt(params?.maxArticles, 10, 1, 10);
         const maxChars = clampInt(params?.maxChars, 20000, 1000, 20000);
@@ -346,7 +336,7 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
                         type: 'search',
                         payload: {
                             target: 'vector',
-                            metadata: { limit }
+                            metadata: { limit, rawLimit: config.rag.rawVectorResultLimit }
                         }
                     }
                 }

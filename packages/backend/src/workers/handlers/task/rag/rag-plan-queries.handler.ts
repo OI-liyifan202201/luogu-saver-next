@@ -53,12 +53,14 @@ export class RagPlanQueriesHandler implements TaskHandler<RagTask> {
         const prompt = `
 <prompt>
 You are a retrieval query planner for a Chinese competitive-programming archive.
-Given the user's question, produce alternative search queries that improve recall.
+Given the user's question, produce retrieval texts that improve recall.
 Rules:
 - Return only JSON.
 - JSON schema: {"queries":["query 1","query 2"]}
-- Generate at most 4 alternative queries.
-- Queries may include Chinese terms, English technical terms, synonyms, and likely article keywords.
+- Generate at most 4 alternative retrieval texts.
+- The retrieval texts may be short keyword phrases or longer natural-language descriptions.
+- Prefer useful search intent descriptions over over-compressed single words when context is needed.
+- Include Chinese terms, English technical terms, synonyms, likely article keywords, and related algorithm names when useful.
 - Do not answer the question.
 </prompt>
 <question>

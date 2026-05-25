@@ -47,7 +47,7 @@ ${context.text}
                     content: prompt
                 }
             ],
-            'chat'
+            'answer'
         );
 
         return {

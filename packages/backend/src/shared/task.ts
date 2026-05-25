@@ -51,6 +51,7 @@ export interface SearchTask extends CommonTask {
         query?: string;
         metadata: {
             limit?: number;
+            rawLimit?: number;
             category?: number;
             authorId?: number;
         };

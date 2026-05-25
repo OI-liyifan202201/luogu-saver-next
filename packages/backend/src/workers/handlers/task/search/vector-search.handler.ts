@@ -31,20 +31,15 @@ export class VectorSearchHandler implements TaskHandler<SearchTask> {
             );
         }
 
-        const limit = clampInt(task.payload.metadata?.limit, 10, 1, 20);
-        const result = await EmbeddingService.getNearestVectors(embedding, limit);
-        const ids = (result.ids?.[0] || []) as string[];
-        const distances = (result.distances?.[0] || []) as number[];
-        const hits = ids.map((id, index) => {
-            const distance = distances[index] ?? 1;
-            return {
-                id,
-                distance,
-                score: Math.max(0, 1 - distance),
-                query,
-                source: 'vector'
-            };
-        });
+        const limit = clampInt(task.payload.metadata?.limit, 10, 1, 100);
+        const rawLimit = clampInt(task.payload.metadata?.rawLimit, 500, 1, 5000);
+        const hits = (
+            await EmbeddingService.getNearestArticleCandidates(embedding, limit, rawLimit)
+        ).map(hit => ({
+            ...hit,
+            query,
+            source: 'vector'
+        }));
 
         return {
             skipNextStep: false,

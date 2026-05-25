@@ -141,13 +141,14 @@ Task graph by logical dependency:
 1. `save` (tracked, reported)
 2. `summary` depends on `save` (tracked)
 3. `censor` depends on `save` (tracked)
-4. `embedding` depends on `summary`
-5. `update-embedding` depends on `embedding`
-6. `update-summary` depends on `summary`
-7. `update-censor` depends on `censor`
-8. `update-search-index` depends on `update-summary`
+4. `update-embedding` depends on `summary`
+5. `update-summary` depends on `summary`
+6. `update-censor` depends on `censor`
+7. `update-search-index` depends on `update-summary`
 
 Permission: public (`null` permission mapping).
+
+Task `update-embedding` SHALL read upstream `summary.data.summary` when present and SHALL NOT depend on `update-summary`.
 
 Task `update-search-index` has `track=true` and `report=true` so clients can observe final search indexing success or failure.
 
@@ -239,7 +240,7 @@ Input parameters:
 | Parameter     | Type   | Required | Default | Constraint                 |
 | ------------- | ------ | -------- | ------- | -------------------------- |
 | `query`       | string | yes      | absent  | Trimmed non-empty text     |
-| `limit`       | number | no       | 10      | Integer in `[1, 20]`       |
+| `limit`       | number | no       | 100     | Integer in `[1, 100]`      |
 | `maxArticles` | number | no       | 10      | Integer in `[1, 10]`       |
 | `maxChars`    | number | no       | 20000   | Integer in `[1000, 20000]` |
 | `articleIds`  | array  | no       | `[]`    | At most 10 article IDs     |
@@ -271,12 +272,13 @@ Task `plan-queries` has type `rag` and target `plan_queries`.
 Task `plan-queries` SHALL:
 
 1. Read the original question from `read-query.data.text`.
-2. Ask the chat LLM scenario for alternative retrieval queries.
+2. Ask the chat LLM scenario for alternative retrieval texts.
 3. Return `data.queries` as an array of strings.
 4. Set `data.queries[0]` exactly equal to the original question text.
 5. Remove empty strings and duplicate strings after trimming.
 6. Return at most 5 queries.
 7. If the LLM call fails or returns invalid JSON, return exactly `[original question text]`.
+8. Generated strings MAY be long natural-language retrieval texts and SHALL NOT be restricted to short keywords.
 
 Each `read-planned-query-i` task SHALL:
 
@@ -286,6 +288,10 @@ Each `read-planned-query-i` task SHALL:
 4. Return `skipNextStep=false` and `data.text=<query>` if a query exists at index `i`.
 
 For every `read-planned-query-i` where `skipNextStep=false`, both `keyword-search-i` and `query-embedding-i` SHALL run over that exact query text, and `vector-search-i` SHALL run over the resulting embedding.
+
+Task `build-context` SHALL receive up to 100 keyword candidates and up to 100 vector candidates per planned query.
+
+Task `build-context` SHALL rerank merged candidates when the LLM rerank scenario is configured.
 
 Task `build-context` SHALL include at most `maxArticles` documents and at most `maxChars` characters in `data.text`.
 
@@ -309,6 +315,8 @@ Task `answer` SHALL ask the LLM to:
 6. Not write prefatory disclaimers such as `下面根据已有材料` or `需要说明`.
 7. Not invite the user to ask follow-up questions.
 8. If no answer can be determined from the documents, output exactly `现有材料无法确定。`.
+
+Task `answer` SHALL use the `answer` LLM scenario.
 
 Permission: `CREATE_WORKFLOW`.
 

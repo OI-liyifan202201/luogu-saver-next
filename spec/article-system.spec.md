@@ -259,10 +259,21 @@ The update handler for `article_embedding_rebuild` SHALL:
 
 1. Load non-deleted articles from the database in ascending `id` order.
 2. Process each loaded batch with at most `metadata.concurrency` articles running at the same time.
-3. For each article, call the embedding LLM scenario with `article.summary` when it is a non-empty string, otherwise with `article.content`.
-4. Upsert the generated vector into Chroma using article ID, metadata `{ title, authorId, category, tags }`, and the same document text used for the embedding input.
-5. Continue processing if one article fails and record that article ID in `failedArticleIds`.
-6. Return `{ processed, updated, failed, failedArticleIds }`.
+3. For each article, call the embedding LLM scenario with `article.summary` when it is a non-empty string, otherwise with `article.content`; upsert that vector as the summary vector.
+4. For each article, split `article.content` into chunks of 4000 characters with 300 characters overlap; call the embedding LLM scenario for each chunk; upsert each chunk vector.
+5. Before inserting chunk vectors for an article, delete existing Chroma chunk vectors with metadata `articleId=article.id` and `kind="chunk"`.
+6. Summary vectors SHALL use ID `article.id`; chunk vectors SHALL use ID `${article.id}:chunk:${index}`.
+7. Vector metadata SHALL include `{ articleId, kind, title, authorId, category, tags }`; chunk vectors SHALL also include `{ chunkIndex, start, end }`.
+8. Continue processing if one article fails and record that article ID in `failedArticleIds`.
+9. Return `{ processed, updated, failed, failedArticleIds }`.
+
+The update handler for `article_embedding` SHALL:
+
+1. Read the article from the database by `targetId`.
+2. If upstream summary output contains non-empty `data.summary`, use that value for the summary vector document.
+3. If upstream summary output is absent, use `article.summary` when non-empty, otherwise `article.content`.
+4. Split `article.content` into chunks and upsert chunk vectors as specified for `article_embedding_rebuild`.
+5. Not modify `article.content` or any article row.
 
 ## 11. File Locations
 
