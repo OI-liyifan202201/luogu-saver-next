@@ -132,24 +132,27 @@
                                                     </a>
                                                 </p>
                                                 <p class="footer-element right-aligned">
-                                                    <a href="/privacy" class="footer-link">
+                                                    <router-link to="/privacy" class="footer-link">
                                                         <Icon>
                                                             <UserShield />
                                                         </Icon>
                                                         <span>隐私协议</span>
-                                                    </a>
-                                                    <a href="/disclaimer" class="footer-link">
+                                                    </router-link>
+                                                    <router-link
+                                                        to="/disclaimer"
+                                                        class="footer-link"
+                                                    >
                                                         <Icon>
                                                             <ExclamationCircle />
                                                         </Icon>
                                                         <span>免责声明</span>
-                                                    </a>
-                                                    <a href="/deletion" class="footer-link">
+                                                    </router-link>
+                                                    <router-link to="/deletion" class="footer-link">
                                                         <Icon>
                                                             <TrashAlt />
                                                         </Icon>
                                                         <span>数据移除政策</span>
-                                                    </a>
+                                                    </router-link>
                                                 </p>
                                                 <p class="footer-element right-aligned">
                                                     <a
