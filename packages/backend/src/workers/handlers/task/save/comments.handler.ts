@@ -3,7 +3,7 @@ import { UnrecoverableError } from 'bullmq';
 import type { SaveTask } from '@/shared/task';
 import { fetch } from '@/utils/fetch';
 import { C3vkMode } from '@/shared/c3vk';
-import type { RepliesData, Reply } from '@/types/luogu-api';
+import type { Reply } from '@/types/luogu-api';
 import { CommentService } from '@/services/comment.service';
 import { UserService } from '@/services/user.service';
 import { buildUser } from '@/utils/luogu-api';
@@ -12,6 +12,10 @@ import { emitToRoom } from '@/lib/socket';
 import { TaskHandler, TaskTextResult, WorkflowResult } from '@/workers/types';
 import { COMMENTS_MAX_PAGES } from '@/shared/comment';
 import type { LuoguComment } from '@/shared/comment';
+
+interface RepliesData {
+    replySlice: Reply[];
+}
 
 export class CommentsHandler implements TaskHandler<SaveTask> {
     public taskType = 'save:comments';
