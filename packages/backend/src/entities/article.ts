@@ -77,6 +77,9 @@ export class Article extends BaseEntity {
     @Column({ type: 'text', nullable: true })
     summary?: string;
 
+    @Column({ name: 'comments_fetched_at', type: 'datetime', nullable: true })
+    commentsFetchedAt?: Date | null;
+
     @ManyToOne(() => User)
     @JoinColumn({ name: 'author_id' })
     author?: User;

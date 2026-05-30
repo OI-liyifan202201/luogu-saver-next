@@ -1,0 +1,102 @@
+# Comment System Specification
+
+## 1. Overview
+
+The comment system fetches the comments shown beneath an article on Luogu and displays them, read-only, beneath the corresponding article on LGS-NG. The original interactive features (posting, replying, voting) are NOT reproduced; LGS-NG only mirrors existing comments for archival and display.
+
+Comments are fetched lazily on article access and re-fetched when stale (TTL-based), mirroring the profile system. Comment content is plain text.
+
+## 2. Data Source
+
+Luogu exposes article comments at:
+
+```
+GET https://www.luogu.com/article/{lid}/replies?sort=&after={cursor}
+```
+
+- `sort` is empty for the default order, or `time-d` for newest-first. The saver always uses the default order.
+- Pagination is cursor-based: `after` is the `id` of the last comment from the previous page (NOT a user id). Omitting `after` returns the first page.
+- Response shape: `{ replySlice: Reply[] }`. An empty `replySlice` signals the end of pagination.
+- Each entry matches the existing `Reply` type: `{ id: number, author: UserSummary, time: number (unix seconds), content: string }`.
+- `content` is plain text and MAY contain newline characters.
+
+Verified against live luogu.com on 2026-05.
+
+## 3. Entity
+
+Table name: `article_comment`.
+
+| Column         | Type            | Constraints     | Description                            |
+| -------------- | --------------- | --------------- | -------------------------------------- |
+| `id`           | BIGINT UNSIGNED | PRIMARY KEY     | Luogu comment id (site-wide unique)    |
+| `article_id`   | VARCHAR(8)      | NOT NULL, INDEX | Owning article lid                     |
+| `author_id`    | INT UNSIGNED    | NOT NULL        | Comment author's Luogu uid             |
+| `content`      | MEDIUMTEXT      | NOT NULL        | Plain-text comment body                |
+| `comment_time` | BIGINT          | NOT NULL        | Original Luogu timestamp, unix seconds |
+
+`author_id` joins to the `user` table. Comment authors are upserted into `user` via the inline path (`buildUser` / `upsertLuoguUser`) so badges and colors are available, exactly like article authors.
+
+The `article` table gains one nullable column `comments_fetched_at DATETIME`, written ONLY by the comment handler. The article save path never touches it (it is absent from `saveLuoguArticle`'s `incomingData` and `defaults`), so re-saving an article does not reset comment staleness.
+
+## 4. TTL
+
+`COMMENTS_TTL_MS = 6 * 60 * 60 * 1000` (6 hours). `CommentService.isCommentsStale(article)` returns true when the article is unknown, `comments_fetched_at` is null, or the last fetch is older than the TTL.
+
+`COMMENTS_MAX_PAGES = 200` bounds pagination defensively.
+
+## 5. Task Handler (`save:comments`)
+
+A new `SaveTarget.COMMENTS` value and a `CommentsHandler` registered on the save processor.
+
+### 5.1 Processing Flow
+
+1. Validate `targetId` is a 1–8 char alphanumeric article lid; reject otherwise with `UnrecoverableError`.
+2. Page through `/article/{lid}/replies?sort=` using `C3vkMode.MODERN`, following the `after` cursor (last comment id of each page), stopping when `replySlice` is empty, the cursor fails to advance, or `COMMENTS_MAX_PAGES` is reached. Duplicate comment ids are de-duplicated defensively.
+3. Upsert every distinct comment author into `user` via `buildUser` / `upsertLuoguUser`.
+4. Map entries to `LuoguComment` (`{ id, authorId, time, content }`).
+5. Call `CommentService.saveLuoguComments(lid, comments)`, which transactionally replaces the article's full comment set and bumps `comments_fetched_at`.
+6. Emit Socket.IO event `article:{lid}:comments-updated` to room `article_{lid}`.
+7. Return `{ skipNextStep: false, data: { text: '' } }` (single-step task, no downstream consumers).
+
+### 5.2 Idempotency
+
+Re-running `save:comments` for the same article replaces the comment set wholesale; no history is kept. Deletions on Luogu propagate (comments absent upstream are removed locally on next fetch).
+
+## 6. API
+
+### 6.1 `GET /article/comments/:id`
+
+Returns the stored comments for the article. If the article's comments are stale, dispatches a fire-and-forget `save:comments` refresh and still returns whatever is currently stored.
+
+Response:
+
+```typescript
+{
+    comments: {
+        id: string,           // comment id as string (avoids JS number precision concerns)
+        content: string,
+        time: number,         // unix seconds
+        author: { id, name?, color?, ccfLevel?, xcpcLevel? }
+    }[],
+    commentsStale: boolean,
+    commentsFetchedAt: Date | null
+}
+```
+
+### 6.2 `POST /article/comments/:id/refresh`
+
+Explicitly dispatches a `save:comments` task. Returns `{ taskId }`.
+
+## 7. Frontend
+
+- `ArticleComments.vue`: a read-only comment list rendered beneath the article body in `ArticleDetailView`. It shows each commenter via the shared `UserLink` (avatar, colored name, certification badges), the comment time, and the plain-text content with `white-space: pre-wrap` to preserve newlines.
+- There is NO reply box and NO voting UI.
+- The component subscribes to `article:{lid}:comments-updated` and reloads silently when the background refresh completes.
+- A manual refresh button dispatches `POST /article/comments/:id/refresh`.
+
+## 8. Invariants
+
+1. The system is display-only: it never posts, edits, votes on, or deletes comments on Luogu.
+2. The article save path never writes `comments_fetched_at` or `article_comment` rows.
+3. Comment content is rendered as plain text (escaped by Vue), never as HTML or Markdown.
+4. A stale read triggers at most a fire-and-forget refresh; the response never blocks on the upstream fetch.

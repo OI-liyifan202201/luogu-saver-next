@@ -8,6 +8,25 @@ import { truncateUtf8 } from '@/utils/string';
 import { TrackingEvent } from '@/shared/event';
 import { RecommendationService } from '@/services/recommendation.service';
 import { ArticleHistoryService } from '@/services/article-history.service';
+import { CommentService } from '@/services/comment.service';
+import { TaskService } from '@/services/task.service';
+import { TaskType, SaveTarget } from '@/shared/task';
+import { logger } from '@/lib/logger';
+
+async function dispatchCommentsRefresh(lid: string): Promise<string | null> {
+    try {
+        const task = await TaskService.createTask(TaskType.SAVE, {
+            target: SaveTarget.COMMENTS,
+            targetId: lid,
+            metadata: {}
+        });
+        await TaskService.dispatchTask(task.id);
+        return task.id;
+    } catch (error) {
+        logger.error({ error, lid }, 'Failed to dispatch comments refresh task');
+        return null;
+    }
+}
 
 router.get('/query/:id', async (ctx: Context) => {
     try {
@@ -76,6 +95,61 @@ router.get('/count', async (ctx: Context) => {
     } catch {
         ctx.fail(500, 'Failed to retrieve article count');
     }
+});
+
+router.get('/comments/:id', async (ctx: Context) => {
+    const lid = ctx.params.id;
+    if (!/^[A-Za-z0-9]{1,8}$/.test(lid)) {
+        ctx.fail(400, 'Invalid article ID');
+        return;
+    }
+    try {
+        const article = await ArticleService.getArticleById(lid);
+        if (!article) {
+            ctx.fail(404, 'Article not found');
+            return;
+        }
+        const stale = CommentService.isCommentsStale(article);
+        if (stale) {
+            void dispatchCommentsRefresh(lid);
+        }
+        const comments = await CommentService.getCommentsByArticle(lid);
+        ctx.success({
+            comments: comments.map(c => ({
+                id: String(c.id),
+                content: c.content,
+                time: c.time,
+                author: c.author
+                    ? {
+                          id: c.author.id,
+                          name: c.author.name,
+                          color: c.author.color,
+                          ccfLevel: c.author.ccfLevel,
+                          xcpcLevel: c.author.xcpcLevel
+                      }
+                    : { id: c.authorId }
+            })),
+            commentsStale: stale,
+            commentsFetchedAt: article.commentsFetchedAt ?? null
+        });
+    } catch (error) {
+        logger.error({ error, lid }, 'Failed to retrieve comments');
+        ctx.fail(500, 'Failed to retrieve comments');
+    }
+});
+
+router.post('/comments/:id/refresh', async (ctx: Context) => {
+    const lid = ctx.params.id;
+    if (!/^[A-Za-z0-9]{1,8}$/.test(lid)) {
+        ctx.fail(400, 'Invalid article ID');
+        return;
+    }
+    const taskId = await dispatchCommentsRefresh(lid);
+    if (!taskId) {
+        ctx.fail(500, 'Failed to dispatch comments refresh');
+        return;
+    }
+    ctx.success({ taskId });
 });
 
 export default router;
