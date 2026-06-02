@@ -72,6 +72,17 @@ export const WORKFLOW_TEMPLATES: Record<string, WorkflowTemplateBuilder> = {
                 }
             },
             {
+                name: 'save-comment',
+                data: {
+                    type: 'save',
+                    payload: {
+                        target: 'comment',
+                        targetId: targetId,
+                        metadata: {}
+                    }
+                }
+            },
+            {
                 name: 'summary',
                 fathers: ['save'],
                 track: true,

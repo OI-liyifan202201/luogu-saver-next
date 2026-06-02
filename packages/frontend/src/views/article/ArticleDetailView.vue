@@ -90,7 +90,7 @@ const triggerRefresh = () => {
 
 const lastUpdate = useLocalStorage(CACHE_STORAGE_KEY + `_article_${articleId}_updated_at`, 0);
 const maybeAutoUpdateArticle = () => {
-    if (Date.now() - lastUpdate.value <= 60 * 60 * 1000) return;
+    if (Date.now() - (lastUpdate.value ?? 0) <= 60 * 60 * 1000) return;
 
     console.log('Auto update triggered for article', articleId);
     saveArticle(articleId).catch(err => console.error('Auto update failed', err));
@@ -439,10 +439,6 @@ onMounted(() => {
                             </Card>
                         </div>
                     </LoadingSkeleton>
-
-                    <div v-if="article" style="margin-top: 20px">
-                        <ArticleComments :article-id="article.id" />
-                    </div>
                 </div>
 
                 <main class="main-content">
@@ -570,6 +566,9 @@ onMounted(() => {
                                 <div v-else class="empty-recommendation">暂无相关推荐</div>
                             </Card>
                         </LoadingSkeleton>
+                    </div>
+                    <div v-if="article" style="margin-top: 20px">
+                        <ArticleComments :article-id="article.id" />
                     </div>
                 </main>
             </div>

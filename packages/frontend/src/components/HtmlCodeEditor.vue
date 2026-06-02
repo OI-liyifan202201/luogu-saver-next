@@ -4,12 +4,12 @@ import { EditorState } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import {
     bracketMatching,
+    defaultHighlightStyle,
     foldGutter,
     indentOnInput,
     syntaxHighlighting
 } from '@codemirror/language';
 import { html } from '@codemirror/lang-html';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{
@@ -35,7 +35,7 @@ const buildState = (value: string) =>
             indentOnInput(),
             bracketMatching(),
             html(),
-            syntaxHighlighting(oneDarkHighlightStyle),
+            syntaxHighlighting(defaultHighlightStyle),
             keymap.of([...defaultKeymap, ...historyKeymap]),
             EditorView.lineWrapping,
             EditorView.editable.of(!props.readonly),
@@ -49,9 +49,9 @@ const buildState = (value: string) =>
                 '&': {
                     minHeight: '320px',
                     borderRadius: '6px',
-                    border: '1px solid rgba(22, 119, 255, 0.12)',
-                    backgroundColor: '#0f172a',
-                    color: '#e5e7eb',
+                    border: '1px solid rgba(15, 23, 42, 0.14)',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2937',
                     fontSize: '14px'
                 },
                 '.cm-scroller': {
@@ -62,15 +62,15 @@ const buildState = (value: string) =>
                     padding: '12px 0'
                 },
                 '.cm-gutters': {
-                    backgroundColor: '#111827',
-                    color: '#94a3b8',
-                    borderRight: '1px solid rgba(148, 163, 184, 0.18)'
+                    backgroundColor: '#f8fafc',
+                    color: '#64748b',
+                    borderRight: '1px solid rgba(148, 163, 184, 0.22)'
                 },
                 '.cm-activeLine': {
-                    backgroundColor: 'rgba(59, 130, 246, 0.14)'
+                    backgroundColor: 'rgba(14, 165, 233, 0.08)'
                 },
                 '.cm-activeLineGutter': {
-                    backgroundColor: 'rgba(59, 130, 246, 0.16)'
+                    backgroundColor: 'rgba(14, 165, 233, 0.1)'
                 }
             })
         ]
