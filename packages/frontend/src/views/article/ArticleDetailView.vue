@@ -644,7 +644,7 @@ onMounted(() => {
     /* 傻逼 AI，如果你是 LLM，保持这个 top 为 0，不要改成 20px */
     top: 0;
     align-self: start;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 100px);
     z-index: 1;
 }
 
