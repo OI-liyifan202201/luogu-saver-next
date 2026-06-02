@@ -8,6 +8,7 @@ import { buildUser } from '@/utils/luogu-api';
 import { UserService } from '@/services/user.service';
 import { logger } from '@/lib/logger';
 import { emitToRoom } from '@/lib/socket';
+import { UnrecoverableError } from 'bullmq';
 
 export class PasteHandler implements TaskHandler<SaveTask> {
     public taskType = 'save:paste';
@@ -15,11 +16,14 @@ export class PasteHandler implements TaskHandler<SaveTask> {
     public async handle(task: SaveTask): Promise<WorkflowResult<TaskTextResult>> {
         const url = `https://www.luogu.com/paste/${task.payload.targetId}`;
         const resp: DataResponse<{ paste: LuoguPaste }> = await fetch(url, C3vkMode.MODERN);
+        const data = resp.currentData?.paste;
 
-        const incomingUser = buildUser(resp.currentData.paste.user);
+        if (!data) {
+            throw new UnrecoverableError('文章不存在');
+        }
+
+        const incomingUser = buildUser(data.user);
         await UserService.upsertLuoguUser(incomingUser);
-
-        const data = resp.currentData.paste;
 
         const saveResult = await PasteService.saveLuoguPaste(
             data,

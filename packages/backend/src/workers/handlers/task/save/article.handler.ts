@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 import { buildUser } from '@/utils/luogu-api';
 import { emitToRoom } from '@/lib/socket';
 import { TaskHandler, TaskTextResult, WorkflowResult } from '@/workers/types';
+import { UnrecoverableError } from 'bullmq';
 
 export class ArticleHandler implements TaskHandler<SaveTask> {
     public taskType = 'save:article';
@@ -15,11 +16,14 @@ export class ArticleHandler implements TaskHandler<SaveTask> {
     public async handle(task: SaveTask): Promise<WorkflowResult<TaskTextResult>> {
         const url = `https://www.luogu.com/article/${task.payload.targetId}`;
         const resp: LentilleDataResponse<ArticleData> = await fetch(url, C3vkMode.MODERN);
+        const data = resp.data?.article;
 
-        const incomingUser = buildUser(resp.data.article.author);
+        if (!data) {
+            throw new UnrecoverableError('文章不存在');
+        }
+
+        const incomingUser = buildUser(data.author);
         await UserService.upsertLuoguUser(incomingUser);
-
-        const data = resp.data.article;
 
         const saveResult = await ArticleService.saveLuoguArticle(
             data,

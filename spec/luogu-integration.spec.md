@@ -251,17 +251,19 @@ Convert Luogu user summary to local User entity:
 **Processing:**
 
 1. Fetch article from Luogu API.
-2. Extract article data from response.
-3. Build or update User entity for author.
-4. Build Article entity with:
+2. Read article data from `response.data.article`.
+3. If `response.data.article` is absent or null, fail the task permanently with exact error message `文章不存在`.
+4. Do not read `response.data.article.author` before step 3 succeeds.
+5. Build or update User entity for author.
+6. Build Article entity with:
     - `id`, `title`, `content`, `category`, `tags`
     - `authorId` linked to user
     - Compute `contentHash` (SHA-256)
-5. Check for existing article:
+7. Check for existing article:
    a. If exists with same hash and title, skip.
    b. Otherwise, push new history version.
-6. Save article to database.
-7. Update task status to COMPLETED.
+8. Save article to database.
+9. Update task status to COMPLETED.
 
 ### 7.2 PasteHandler
 
@@ -280,13 +282,15 @@ Convert Luogu user summary to local User entity:
 **Processing:**
 
 1. Fetch paste from Luogu API.
-2. Extract paste data from response.
-3. Build or update User entity for author.
-4. Build Paste entity with:
+2. Read paste data from `response.currentData.paste`.
+3. If `response.currentData.paste` is absent or null, fail the task permanently with exact error message `文章不存在`.
+4. Do not read `response.currentData.paste.user` before step 3 succeeds.
+5. Build or update User entity for author.
+6. Build Paste entity with:
     - `id`, `content`
     - `authorId` linked to user
-5. Save paste to database.
-6. Update task status to COMPLETED.
+7. Save paste to database.
+8. Update task status to COMPLETED.
 
 ### 7.3 ProfileHandler
 

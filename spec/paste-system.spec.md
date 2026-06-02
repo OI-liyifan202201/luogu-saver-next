@@ -134,12 +134,15 @@ The `paste.renderContent()` method:
 The `save:paste` task SHALL:
 
 1. Fetch `https://www.luogu.com/paste/{targetId}`.
-2. Upsert the Luogu paste author before saving the paste.
-3. Save the paste through `PasteService.saveLuoguPaste`.
-4. If `saveLuoguPaste` returns `skipped=true`, return `skipNextStep=true` and `data.text=""`.
-5. If `saveLuoguPaste` returns `skipped=false`, emit websocket event `paste:{id}:updated` to room `paste_{id}`.
-6. If saved content is empty, return `skipNextStep=true` and `data.text=""`.
-7. If saved content is non-empty, return `skipNextStep=false` and `data.text` equal to saved content.
+2. Read paste data from `response.currentData.paste`.
+3. If `response.currentData.paste` is absent or null, fail permanently with exact error message `文章不存在`.
+4. Do not read `response.currentData.paste.user` before step 3 succeeds.
+5. Upsert the Luogu paste author before saving the paste.
+6. Save the paste through `PasteService.saveLuoguPaste`.
+7. If `saveLuoguPaste` returns `skipped=true`, return `skipNextStep=true` and `data.text=""`.
+8. If `saveLuoguPaste` returns `skipped=false`, emit websocket event `paste:{id}:updated` to room `paste_{id}`.
+9. If saved content is empty, return `skipNextStep=true` and `data.text=""`.
+10. If saved content is non-empty, return `skipNextStep=false` and `data.text` equal to saved content.
 
 ## 6. Soft Deletion
 
