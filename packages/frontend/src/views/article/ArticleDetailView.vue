@@ -665,7 +665,7 @@ onMounted(() => {
 
 .toc-card {
     margin-top: 0;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 100px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
