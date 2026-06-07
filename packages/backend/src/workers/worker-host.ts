@@ -17,6 +17,7 @@ import { emitToRoom } from '@/lib/socket';
 export class WorkerHost<T extends CommonTask> {
     public worker: Worker<T>;
     private queueEvents: QueueEvents;
+    private isPausingWorker: boolean;
 
     constructor(
         queueName: string,
@@ -38,7 +39,7 @@ export class WorkerHost<T extends CommonTask> {
             },
             ...options
         });
-
+        this.isPausingWorker = false;
         this.setupEvents();
     }
 
@@ -53,12 +54,32 @@ export class WorkerHost<T extends CommonTask> {
 
         if (!hasPoints) {
             logger.warn({ jobId: job.id }, 'Rate limited by PointGuard, delaying job...');
-            await this.worker.pause(false);
-            // Stop the worker immediately
-            setTimeout(() => this.worker.resume(), this.pointGuard.getRegenerationInterval());
-            const jitterDelay =
-                this.pointGuard.getRegenerationInterval() + Math.floor(Math.random() * 4000);
+            const regenInterval = this.pointGuard.getRegenerationInterval();
+            const jitterDelay = regenInterval + Math.floor(Math.random() * 4000);
             await job.moveToDelayed(Date.now() + jitterDelay, job.token);
+            if (!this.isPausingWorker) {
+                this.isPausingWorker = true;
+                setImmediate(async () => {
+                    try {
+                        await this.worker.pause(false);
+                        // Stop the worker immediately
+                        setTimeout(() => {
+                            try {
+                                this.worker.resume();
+                            } catch {
+                                logger.error(
+                                    { name: this.worker.name },
+                                    'Failed to resume the queue.'
+                                );
+                            } finally {
+                                this.isPausingWorker = false;
+                            }
+                        }, regenInterval);
+                    } catch {
+                        logger.error({ name: this.worker.name }, 'Failed to pause the worker.');
+                    }
+                });
+            }
             throw new DelayedError();
         }
 
