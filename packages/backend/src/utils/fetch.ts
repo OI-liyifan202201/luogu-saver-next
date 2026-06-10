@@ -3,6 +3,12 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { config } from '@/config';
 import { logger } from '@/lib/logger';
 import { UnrecoverableError } from 'bullmq';
+import {
+    getTorAxiosConfig,
+    isNative429TorOnly,
+    markNative429TorOnly,
+    rotateTorExitIp
+} from '@/utils/tor';
 
 const USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36';
@@ -12,18 +18,21 @@ const axiosConfig: AxiosRequestConfig = {
     validateStatus: () => true
 };
 
-function handleRequestError(err: any): never {
+function isRetriableRequestError(err: any): boolean {
     const code = err.code;
     const msg = err.message || '';
-    if (
+    return (
         code === 'ECONNABORTED' ||
         code === 'ETIMEDOUT' ||
         code === 'ECONNREFUSED' ||
         code === 'ECONNRESET' ||
         msg.includes('timeout')
-    ) {
-        throw new Error('Network timeout or connection error: ' + code);
-    }
+    );
+}
+
+function handleRequestError(err: any): never {
+    if (isRetriableRequestError(err))
+        throw new Error('Network timeout or connection error: ' + err.code);
     throw new UnrecoverableError(err.message || 'Unknown network error');
 }
 
@@ -64,7 +73,8 @@ async function handleLegacyC3VK(
     response: AxiosResponse,
     url: string,
     headers: Record<string, string>,
-    timeout: number
+    timeout: number,
+    transportConfig: AxiosRequestConfig = {}
 ): Promise<AxiosResponse> {
     if (typeof response.data === 'string') {
         const m = response.data.match(/C3VK=([a-zA-Z0-9]+);/);
@@ -77,12 +87,86 @@ async function handleLegacyC3VK(
             logger.debug({ url, c3vk: c3vkValue }, 'Detected Legacy C3VK token, retrying request');
             return await axios.get(url, {
                 ...axiosConfig,
+                ...transportConfig,
                 headers: newHeaders,
                 timeout
             });
         }
     }
     return response;
+}
+
+async function requestLuoguOnce(
+    url: string,
+    mode: C3vkMode,
+    headers: Record<string, string>,
+    timeout: number,
+    transportConfig: AxiosRequestConfig = {}
+): Promise<AxiosResponse> {
+    let resp: AxiosResponse;
+    try {
+        resp = await axios.get(url, {
+            ...axiosConfig,
+            ...transportConfig,
+            headers,
+            timeout
+        });
+    } catch (err: any) {
+        handleRequestError(err);
+    }
+
+    if (mode === C3vkMode.LEGACY) {
+        resp = await handleLegacyC3VK(resp, url, headers, timeout, transportConfig);
+    }
+    if (mode === C3vkMode.MODERN && resp.status === 302 && resp.headers.location) {
+        mergeSetCookieToHeaders(resp, headers);
+        logger.debug(
+            {
+                url,
+                location: resp.headers.location,
+                status: resp.status
+            },
+            'Detected New C3VK redirect, merging cookies and retrying'
+        );
+        try {
+            resp = await axios.get(url, {
+                ...axiosConfig,
+                ...transportConfig,
+                headers,
+                timeout
+            });
+        } catch (err: any) {
+            handleRequestError(err);
+        }
+    }
+
+    return resp;
+}
+
+async function requestViaTorWithRotation(
+    url: string,
+    mode: C3vkMode,
+    headers: Record<string, string>,
+    timeout: number
+): Promise<AxiosResponse> {
+    const torTransportConfig = getTorAxiosConfig();
+    try {
+        const resp = await requestLuoguOnce(url, mode, headers, timeout, torTransportConfig);
+        if (resp.status !== 429) return resp;
+
+        logger.warn({ url, status: resp.status }, 'Tor request was rate limited, rotating exit IP');
+    } catch (error) {
+        if (error instanceof UnrecoverableError) throw error;
+        logger.warn({ error, url }, 'Tor request failed, rotating exit IP');
+    }
+
+    try {
+        await rotateTorExitIp();
+    } catch (error) {
+        logger.warn({ error }, 'Failed to rotate Tor exit IP before retry');
+    }
+
+    return await requestLuoguOnce(url, mode, headers, timeout, torTransportConfig);
 }
 
 /**
@@ -115,36 +199,25 @@ export async function fetch(
 
     logger.debug({ url, mode }, 'Fetching the page');
     let resp: AxiosResponse;
-    try {
-        resp = await axios.get(url, {
-            ...axiosConfig,
-            headers,
-            timeout
-        });
-    } catch (err: any) {
-        handleRequestError(err);
-    }
-    if (mode === C3vkMode.LEGACY) {
-        resp = await handleLegacyC3VK(resp, url, headers, timeout);
-    }
-    if (mode === C3vkMode.MODERN && resp.status === 302 && resp.headers.location) {
-        mergeSetCookieToHeaders(resp, headers);
-        logger.debug(
-            {
-                url,
-                location: resp.headers.location,
-                status: resp.status
-            },
-            'Detected New C3VK redirect, merging cookies and retrying'
-        );
+    if (await isNative429TorOnly()) {
+        logger.debug({ url }, 'Fetching the page through Tor due to native 429 marker');
+        resp = await requestViaTorWithRotation(url, mode, headers, timeout);
+    } else {
         try {
-            resp = await axios.get(url, {
-                ...axiosConfig,
-                headers,
-                timeout
-            });
-        } catch (err: any) {
-            handleRequestError(err);
+            resp = await requestLuoguOnce(url, mode, headers, timeout);
+        } catch (error) {
+            if (!config.network.tor.enabled || error instanceof UnrecoverableError) throw error;
+            logger.warn({ error, url }, 'Native request failed, falling back to Tor');
+            resp = await requestViaTorWithRotation(url, mode, headers, timeout);
+        }
+
+        if (resp.status === 429 && config.network.tor.enabled) {
+            await markNative429TorOnly();
+            logger.warn(
+                { url, status: resp.status },
+                'Native request was rate limited, falling back to Tor'
+            );
+            resp = await requestViaTorWithRotation(url, mode, headers, timeout);
         }
     }
     logger.debug({ url, status: resp.status }, 'Page fetch completed');

@@ -29,11 +29,20 @@ The configuration is validated using Zod schemas. All fields have default values
 
 ### 3.1 Server Configuration
 
-| Field             | Type   | Default       | Description                   |
-| ----------------- | ------ | ------------- | ----------------------------- |
-| `port`            | number | 3000          | HTTP server listening port    |
-| `env`             | string | "development" | Environment name              |
-| `network.timeout` | number | 30000         | Network request timeout in ms |
+| Field                                | Type    | Default                             | Description                                                |
+| ------------------------------------ | ------- | ----------------------------------- | ---------------------------------------------------------- |
+| `port`                               | number  | 3000                                | HTTP server listening port                                 |
+| `env`                                | string  | "development"                       | Environment name                                           |
+| `network.timeout`                    | number  | 30000                               | Network request timeout in ms                              |
+| `network.tor.enabled`                | boolean | false                               | Enable Tor fallback for Luogu 429/network failures         |
+| `network.tor.socksProxyUrl`          | string  | `socks5h://127.0.0.1:9050`          | Tor SOCKS proxy URL                                        |
+| `network.tor.controlHost`            | string  | `127.0.0.1`                         | Tor control port host                                      |
+| `network.tor.controlPort`            | number  | 9051                                | Tor control port                                           |
+| `network.tor.controlPassword`        | string  | ""                                  | Original password used to generate `HashedControlPassword` |
+| `network.tor.newnymCooldownMs`       | number  | 10000                               | Wait time after `SIGNAL NEWNYM` before reusing Tor         |
+| `network.tor.newnymLockTtlMs`        | number  | 30000                               | Redis lock TTL for global Tor exit rotation                |
+| `network.tor.native429FallbackTtlMs` | number  | 7200000                             | Duration to skip native Luogu requests after native 429    |
+| `network.tor.ipCheckUrl`             | string  | `https://api.ipify.org?format=json` | URL used through Tor to log the current exit IP            |
 
 ### 3.2 Database Configuration (`db`)
 

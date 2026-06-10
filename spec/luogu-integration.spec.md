@@ -31,6 +31,18 @@ Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)
 | `validateStatus` | () => true             | Accept all HTTP status codes          |
 | `timeout`        | config.network.timeout | Request timeout in ms                 |
 
+### 2.3 Tor Fallback Configuration
+
+If `config.network.tor.enabled` is `false`, Tor fallback SHALL NOT run.
+
+If `config.network.tor.enabled` is `true`, the fetch utility SHALL support Tor fallback using `config.network.tor.socksProxyUrl`.
+
+Tor control authentication SHALL use `config.network.tor.controlPassword` as the original password used to generate Tor `HashedControlPassword`. The application SHALL NOT treat the `HashedControlPassword` hash value as an authentication credential.
+
+The Redis key `luogu:tor:native429` SHALL indicate that native Luogu requests are temporarily disabled after a native HTTP 429 response. The key TTL SHALL equal `config.network.tor.native429FallbackTtlMs`.
+
+The Redis key `luogu:tor:newnym:lock` SHALL be used as a global lock for Tor exit rotation. A process SHALL acquire it with NX and PX semantics before sending `SIGNAL NEWNYM`.
+
 ## 3. C3VK Challenge Handling
 
 Luogu uses a challenge-response mechanism called C3VK to prevent automated access.
@@ -88,19 +100,33 @@ async function fetch(url: string, mode: C3vkMode, cookie?: Record<string, string
 
 ```
 1. Build headers with defaults and optional cookies.
-2. Make initial GET request.
-3. If mode === LEGACY:
+2. If Tor fallback is enabled and Redis key luogu:tor:native429 exists, make the request through Tor. Otherwise make a native request.
+3. If the native request returns HTTP 429:
+   a. Set Redis key luogu:tor:native429 with TTL config.network.tor.native429FallbackTtlMs.
+   b. Make the request through Tor.
+4. If the native request returns HTTP 403, do not use Tor and throw UnrecoverableError("Access blocked with code 403").
+5. If the native request fails with a retriable network error and Tor fallback is enabled, make the request through Tor.
+6. If the first Tor request returns HTTP 429 or fails with a retriable network error:
+   a. Acquire the global Redis lock luogu:tor:newnym:lock.
+   b. If the lock is acquired, authenticate to the Tor control port, send SIGNAL NEWNYM, wait config.network.tor.newnymCooldownMs, and request config.network.tor.ipCheckUrl through Tor.
+   c. If IP verification returns JSON with a non-empty ip field, write an info log entry with field ip and message Tor exit IP changed.
+   d. If IP verification fails, write a warn log entry and continue.
+   e. If the lock is not acquired, wait config.network.tor.newnymCooldownMs and do not call the Tor control port.
+   f. Make one final request through Tor.
+7. If mode === LEGACY:
    a. Check for inline C3VK token.
    b. Retry if found.
-4. If mode === MODERN and status === 302:
+8. If mode === MODERN and status === 302:
    a. Merge Set-Cookie headers.
    b. Retry request.
-5. Check status:
+9. Check status:
    a. 401: Log warning, throw UnrecoverableError("Unauthorized fetch")
-6. Parse response:
+   b. 403: Log warning, throw UnrecoverableError("Access blocked with code 403")
+   c. 429 after final Tor attempt: Log warning, throw UnrecoverableError("Access blocked with code 429")
+10. Parse response:
    a. If string, JSON.parse().
    b. Otherwise, return as-is.
-7. Return parsed data.
+11. Return parsed data.
 ```
 
 ### 4.3 Error Handling
@@ -114,6 +140,9 @@ async function fetch(url: string, mode: C3vkMode, cookie?: Record<string, string
 | timeout message | Throw retriable network error              |
 | Other errors    | Throw `UnrecoverableError`                 |
 | HTTP 401        | Throw `UnrecoverableError("Unauthorized")` |
+| HTTP 403        | Throw `UnrecoverableError`; do not use Tor |
+| Native HTTP 429 | Set Tor-only Redis marker and try Tor      |
+| Tor HTTP 429    | Rotate Tor exit IP once, then retry once   |
 | JSON parse fail | Throw `UnrecoverableError`                 |
 
 Network errors are retriable by BullMQ; `UnrecoverableError` stops retries.
