@@ -13,10 +13,9 @@ import {
     useDialog,
     useMessage
 } from 'naive-ui';
-import { SyncOutline, TrophyOutline, ReaderOutline } from '@vicons/ionicons5';
+import { SyncOutline, TrophyOutline, ReaderOutline, PersonCircleOutline } from '@vicons/ionicons5';
 
 import { getUserProfile, refreshUserProfile } from '@/api/user';
-import socket from '@/utils/websocket';
 import type { UserProfile } from '@/types/user';
 
 import Card from '@/components/Card.vue';
@@ -27,7 +26,14 @@ import { useContentSaver } from '@/composables/useContentSaver';
 const route = useRoute();
 const message = useMessage();
 const dialog = useDialog();
-const { isSaving, setupTaskUpdateListener } = useContentSaver();
+const {
+    isSaving,
+    hasUpdate,
+    setupUpdateListener,
+    setupTaskUpdateListener,
+    handleRefresh,
+    stopSaving
+} = useContentSaver();
 
 const loading = ref(true);
 const profile = ref<UserProfile | null>(null);
@@ -65,26 +71,21 @@ const orderedPrizes = computed(() => {
 const room = computed(() => (uid.value !== null ? `user_${uid.value}` : null));
 const event = computed(() => (uid.value !== null ? `user:${uid.value}:profile-updated` : null));
 
-let listenerAttached = false;
 let stopSaveTaskListener: (() => void) | null = null;
+let stopProfileUpdateListener: (() => void) | null = null;
 
-function onProfileUpdated() {
-    if (uid.value === null) return;
-    void reload(/* silent */ true);
-}
-
-function attachSocket() {
-    if (listenerAttached || !room.value || !event.value) return;
-    socket.joinRoom(room.value);
-    socket.getInstance().on(event.value, onProfileUpdated);
-    listenerAttached = true;
-}
-
-function detachSocket() {
-    if (!listenerAttached || !room.value || !event.value) return;
-    socket.getInstance().off(event.value, onProfileUpdated);
-    socket.leaveRoom(room.value);
-    listenerAttached = false;
+function setupProfileUpdateListener() {
+    stopProfileUpdateListener?.();
+    stopProfileUpdateListener = null;
+    if (!room.value || !event.value) return;
+    stopProfileUpdateListener = setupUpdateListener(
+        room.value,
+        event.value,
+        () => {
+            void reload();
+        },
+        () => Boolean(profile.value)
+    );
 }
 
 async function reload(silent = false) {
@@ -97,6 +98,7 @@ async function reload(silent = false) {
             promptSaveProfileIfNeeded();
         } else {
             profile.value = res.data;
+            stopSaving();
             saveDialogShown.value = false;
         }
     } catch (e: any) {
@@ -121,7 +123,7 @@ function trackSaveTask(taskId?: string) {
             stopSaveTaskListener = null;
             message.success('用户主页保存完成');
             saveDialogShown.value = false;
-            void reload(/* silent */ true);
+            void reload();
         },
         error => {
             stopSaveTaskListener = null;
@@ -131,9 +133,11 @@ function trackSaveTask(taskId?: string) {
                 positiveText: '重试',
                 negativeText: '取消',
                 onPositiveClick: async () => {
+                    isSaving.value = true;
                     await submitProfileSave();
                 },
                 onNegativeClick: () => {
+                    stopSaving();
                     saveDialogShown.value = false;
                 },
                 maskClosable: false,
@@ -167,14 +171,17 @@ function promptSaveProfileIfNeeded() {
         maskClosable: false,
         onPositiveClick: async () => {
             try {
+                isSaving.value = true;
                 await submitProfileSave();
                 message.success('保存任务已提交');
             } catch (e: any) {
                 message.error(e.message || '保存失败');
+                stopSaving();
                 saveDialogShown.value = false;
             }
         },
         onNegativeClick: () => {
+            stopSaving();
             saveDialogShown.value = false;
         }
     });
@@ -194,8 +201,15 @@ async function handleManualRefresh() {
     }
 }
 
+function triggerRefresh() {
+    handleRefresh(() => {
+        void reload();
+    });
+}
+
 watch(uid, async () => {
-    detachSocket();
+    stopProfileUpdateListener?.();
+    stopProfileUpdateListener = null;
     profile.value = null;
     saveDialogShown.value = false;
     stopSaveTaskListener?.();
@@ -205,7 +219,7 @@ watch(uid, async () => {
         return;
     }
     await reload();
-    attachSocket();
+    setupProfileUpdateListener();
 });
 
 onMounted(async () => {
@@ -214,11 +228,11 @@ onMounted(async () => {
         return;
     }
     await reload();
-    attachSocket();
+    setupProfileUpdateListener();
 });
 
 onUnmounted(() => {
-    detachSocket();
+    stopProfileUpdateListener?.();
     stopSaveTaskListener?.();
 });
 </script>
@@ -247,7 +261,11 @@ onUnmounted(() => {
 
                 <!-- RIGHT COLUMN: identity card + compact prizes list -->
                 <div class="profile-right">
-                    <Card class="profile-card profile-card--identity">
+                    <Card
+                        class="profile-card profile-card--identity"
+                        title="用户主页"
+                        :icon="PersonCircleOutline"
+                    >
                         <div class="identity-header">
                             <n-avatar
                                 round
@@ -375,6 +393,20 @@ onUnmounted(() => {
                 </div>
             </div>
         </n-spin>
+
+        <div v-if="hasUpdate" class="update-floater">
+            <n-button
+                type="primary"
+                circle
+                size="large"
+                class="shadow-button"
+                @click="triggerRefresh"
+            >
+                <template #icon>
+                    <n-icon><SyncOutline /></n-icon>
+                </template>
+            </n-button>
+        </div>
     </div>
 </template>
 
@@ -383,6 +415,36 @@ onUnmounted(() => {
     max-width: 1200px;
     margin: 0 auto;
     min-width: 0;
+}
+
+.update-floater {
+    position: fixed;
+    bottom: 32px;
+    left: 260px;
+    z-index: 999;
+    animation: slide-in 0.3s ease-out;
+}
+
+.shadow-button {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.user-profile-view :deep(.n-spin-body) {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .profile-grid {

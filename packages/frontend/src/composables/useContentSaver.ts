@@ -54,11 +54,22 @@ export function useContentSaver() {
         isSaving.value = false;
     };
 
-    const setupUpdateListener = (room: string, event: string, onRefresh: () => void) => {
+    const setupUpdateListener = (
+        room: string,
+        event: string,
+        onRefresh: () => void,
+        shouldPrompt: () => boolean = () => true
+    ) => {
         socket.joinRoom(room);
 
         const handleUpdate = () => {
             stopSaving();
+            if (!shouldPrompt()) {
+                hasUpdate.value = false;
+                onRefresh();
+                return;
+            }
+
             hasUpdate.value = true;
             if (updateDialogOpen) return;
             updateDialogOpen = true;
@@ -80,10 +91,14 @@ export function useContentSaver() {
 
         socket.getInstance().on(event, handleUpdate);
 
-        addCleanup(() => {
+        const cleanup = () => {
             socket.getInstance().off(event, handleUpdate);
             socket.leaveRoom(room);
-        });
+            cleanupCallbacks.delete(cleanup);
+        };
+
+        addCleanup(cleanup);
+        return cleanup;
     };
 
     const setupTaskUpdateListener = (
