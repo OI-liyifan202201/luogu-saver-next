@@ -85,8 +85,10 @@ Postconditions:
 5. `workflow.root_job_id` equals the BullMQ root job ID and equals one value in `taskIds`.
 6. The submitted BullMQ Flow contains every task in `tasks` exactly once.
 7. Each submitted BullMQ job SHALL set `failParentOnFailure = true`.
-8. If a workflow node reaches final failure, each parent waiting on that node SHALL fail instead of remaining in `waiting-children` indefinitely.
-9. If workflow creation fails before the API response is sent, no `workflow` row with `id = workflowId` remains in the database.
+8. Each submitted BullMQ job SHALL set `priority` equal to the workflow creation option `priority`.
+9. If the workflow is created from an HTTP workflow API endpoint, the creation option `priority` SHALL be `1`.
+10. If a workflow node reaches final failure, each parent waiting on that node SHALL fail instead of remaining in `waiting-children` indefinitely.
+11. If workflow creation fails before the API response is sent, no `workflow` row with `id = workflowId` remains in the database.
 
 ### 4.2 POST `/workflow/create/template/:name`
 
@@ -99,6 +101,10 @@ Permission model:
 3. If mapped permission is non-null, requester must be authenticated and satisfy the mapped permission bit.
 
 Output format is identical to section 4.1.
+
+Workflows created by this endpoint SHALL use creation option `priority = 1`.
+
+For BullMQ priorities, a smaller positive integer is higher priority than a larger positive integer.
 
 ### 4.3 GET `/workflow/query/:id`
 

@@ -93,7 +93,7 @@ If fetching or parsing fails:
 2. Reject inactive or missing runs.
 3. Insert one `discovered_article` row with source `plaza`.
 4. If `(run_id, article_id)` already exists, update `last_seen_at` and return duplicate.
-5. Create one `article-save-pipeline` workflow with `targetId = articleId` and `forceUpdate`.
+5. Create one `article-save-pipeline` workflow with `targetId = articleId`, `forceUpdate`, and BullMQ job priority `10`.
 6. On workflow creation success, set row status to `workflow_created` and store `workflow_id`.
 7. On workflow creation failure, set row status to `failed` and store the error message.
 

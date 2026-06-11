@@ -223,6 +223,9 @@ export class DiscoveryService {
                 {
                     targetId: input.articleId,
                     forceUpdate: input.forceUpdate
+                },
+                {
+                    priority: 10
                 }
             );
             await getServiceRepository<DiscoveredArticle>(DiscoveredArticle).update(row.id, {

@@ -17,6 +17,12 @@ import {
 import { TaskStatus } from '@/shared/task';
 import { getRandomString } from '@/utils/string';
 
+type WorkflowCreateOptions = {
+    priority?: number;
+};
+
+const USER_WORKFLOW_PRIORITY = 1;
+
 export class WorkflowService {
     private static _flowProducer: FlowProducer;
 
@@ -34,15 +40,20 @@ export class WorkflowService {
         return this._flowProducer;
     }
 
-    static async createWorkflow(definition: WorkflowDefinition) {
+    static async createWorkflow(
+        definition: WorkflowDefinition,
+        options: WorkflowCreateOptions = {}
+    ) {
         validateFlowStructure(definition);
         await this.ensureWorkflowQueueCapacity(definition);
 
+        const priority = options.priority ?? USER_WORKFLOW_PRIORITY;
         const workflowId = randomUUID();
         const taskIds = this.createTaskIds(definition);
         const rootJobNode = WorkflowBuilder.buildLinearFlow(definition.tasks, {
             workflowId,
-            taskIds
+            taskIds,
+            priority
         });
         const rootJobId = rootJobNode.opts?.jobId;
         if (!rootJobId) {
@@ -92,7 +103,11 @@ export class WorkflowService {
         };
     }
 
-    static async createWorkflowFromTemplate(templateName: string, params: any) {
+    static async createWorkflowFromTemplate(
+        templateName: string,
+        params: any,
+        options: WorkflowCreateOptions = {}
+    ) {
         const templateBuilders = new Map<string, unknown>(Object.entries(WORKFLOW_TEMPLATES));
         const builder = templateBuilders.get(templateName);
         if (builder === undefined) throw new Error(`Template ${templateName} not found`);
@@ -101,11 +116,7 @@ export class WorkflowService {
             throw new Error(`Template ${templateName} is invalid`);
         }
 
-        if (templateName !== 'article-save-pipeline') {
-            return this.createWorkflow(builder(params));
-        }
-
-        return this.createWorkflow(builder(params));
+        return this.createWorkflow(builder(params), options);
     }
 
     static async getWorkflowById(id: string) {

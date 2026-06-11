@@ -11,6 +11,7 @@ interface FlowTask extends TaskDefinition {
 type WorkflowBuildOptions = {
     workflowId: string;
     taskIds: Record<string, string>;
+    priority: number;
 };
 
 export class WorkflowBuilder {
@@ -36,7 +37,8 @@ export class WorkflowBuilder {
                 queueName: queueName,
                 opts: {
                     jobId: options.taskIds[task.name],
-                    failParentOnFailure: true
+                    failParentOnFailure: true,
+                    priority: options.priority
                 },
                 data: {
                     ...task.data,
