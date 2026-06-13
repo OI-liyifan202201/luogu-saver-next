@@ -183,6 +183,8 @@ const loadData = async () => {
         }
         article.value = res.data;
 
+        document.title = `${article.value.title} - 洛谷保存站`;
+
         if (article.value?.renderedContent) {
             const result = generateTocAndProcessHtml(article.value.renderedContent);
             displayContent.value = result.html;

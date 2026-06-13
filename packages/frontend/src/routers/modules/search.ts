@@ -6,7 +6,8 @@ export default [
         name: 'search',
         component: () => import('@/views/search/SearchView.vue'),
         meta: {
-            activeMenu: 'search'
+            activeMenu: 'search',
+            title: '搜索'
         }
     }
 ] as RouteRecordRaw[];

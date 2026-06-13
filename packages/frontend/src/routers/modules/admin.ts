@@ -6,7 +6,8 @@ export default [
         name: 'admin',
         component: () => import('@/views/admin/AdminView.vue'),
         meta: {
-            activeMenu: 'admin'
+            activeMenu: 'admin',
+            title: '管理后台'
         }
     }
 ] as RouteRecordRaw[];

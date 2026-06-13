@@ -98,6 +98,7 @@ async function reload(silent = false) {
             promptSaveProfileIfNeeded();
         } else {
             profile.value = res.data;
+            document.title = `${res.data.name} - 洛谷保存站`;
             stopSaving();
             saveDialogShown.value = false;
         }

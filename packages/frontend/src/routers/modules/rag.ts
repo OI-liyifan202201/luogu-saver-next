@@ -6,7 +6,8 @@ export default [
         name: 'rag',
         component: () => import('@/views/rag/RagView.vue'),
         meta: {
-            activeMenu: 'rag'
+            activeMenu: 'rag',
+            title: ' RAG'
         }
     }
 ] as RouteRecordRaw[];

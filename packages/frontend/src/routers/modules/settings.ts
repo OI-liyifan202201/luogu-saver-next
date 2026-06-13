@@ -6,7 +6,8 @@ export default [
         name: 'settings',
         component: () => import('@/views/settings/SettingsView.vue'),
         meta: {
-            activeMenu: 'settings'
+            activeMenu: 'settings',
+            title: '设置'
         }
     }
 ] as RouteRecordRaw[];

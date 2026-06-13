@@ -6,7 +6,8 @@ export default [
         name: 'user-profile',
         component: () => import('@/views/user/UserProfileView.vue'),
         meta: {
-            activeMenu: ''
+            activeMenu: '',
+            title: '用户主页'
         }
     }
 ] as RouteRecordRaw[];

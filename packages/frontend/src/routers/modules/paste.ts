@@ -6,7 +6,8 @@ export default [
         name: 'paste-detail',
         component: () => import('@/views/paste/PasteDetailView.vue'),
         meta: {
-            activeMenu: ''
+            activeMenu: '',
+            title: '剪贴板'
         }
     }
 ] as RouteRecordRaw[];

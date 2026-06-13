@@ -6,7 +6,8 @@ export default [
         name: 'about',
         component: () => import('@/views/about/AboutView.vue'),
         meta: {
-            activeMenu: 'about'
+            activeMenu: 'about',
+            title: '关于'
         }
     }
 ] as RouteRecordRaw[];

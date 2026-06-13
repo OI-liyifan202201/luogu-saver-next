@@ -7,7 +7,8 @@ export default [
         component: () => import('@/views/legal/LegalView.vue'),
         props: { docKey: 'privacy' },
         meta: {
-            activeMenu: ''
+            activeMenu: '',
+            title: '隐私政策'
         }
     },
     {
@@ -16,7 +17,8 @@ export default [
         component: () => import('@/views/legal/LegalView.vue'),
         props: { docKey: 'disclaimer' },
         meta: {
-            activeMenu: ''
+            activeMenu: '',
+            title: '免责声明'
         }
     },
     {
@@ -25,7 +27,8 @@ export default [
         component: () => import('@/views/legal/LegalView.vue'),
         props: { docKey: 'deletion' },
         meta: {
-            activeMenu: ''
+            activeMenu: '',
+            title: '数据移除政策'
         }
     }
 ] as RouteRecordRaw[];

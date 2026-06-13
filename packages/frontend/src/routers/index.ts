@@ -6,7 +6,8 @@ const routes: RouteRecordRaw[] = [
         name: 'home',
         component: () => import('@/views/HomeView.vue'),
         meta: {
-            activeMenu: 'home'
+            activeMenu: 'home',
+            title: '首页'
         }
     }
 ];
@@ -27,6 +28,12 @@ routes.push({
 const router = createRouter({
     history: createWebHistory(),
     routes
+});
+
+const DEFAULT_TITLE = '洛谷保存站';
+
+router.afterEach(to => {
+    document.title = to.meta.title ? `${to.meta.title} - ${DEFAULT_TITLE}` : DEFAULT_TITLE;
 });
 
 export default router;

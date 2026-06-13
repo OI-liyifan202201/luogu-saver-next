@@ -6,7 +6,8 @@ export default [
         name: 'statistic',
         component: () => import('@/views/statistic/StatisticView.vue'),
         meta: {
-            activeMenu: 'statistic'
+            activeMenu: 'statistic',
+            title: '统计'
         }
     }
 ] as RouteRecordRaw[];

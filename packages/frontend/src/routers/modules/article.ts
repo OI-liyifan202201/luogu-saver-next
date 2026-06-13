@@ -6,7 +6,8 @@ export default [
         name: 'article-detail',
         component: () => import('@/views/article/ArticleDetailView.vue'),
         meta: {
-            activeMenu: 'article'
+            activeMenu: 'article',
+            title: '文章'
         }
     }
 ] as RouteRecordRaw[];
