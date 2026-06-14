@@ -81,8 +81,27 @@ async function getProcessor() {
                 '*': ['className'],
                 div: [...(defaultSchema.attributes?.div || []), 'style', ['data*']],
                 span: [...(defaultSchema.attributes?.span || []), 'className', 'style'],
+                input: [...(defaultSchema.attributes?.input || []), 'type', 'checked', 'disabled'],
                 pre: ['className', 'style'],
                 code: ['className', 'style'],
+                th: [
+                    ...(defaultSchema.attributes?.th || []),
+                    'align',
+                    'className',
+                    'rowspan',
+                    'colspan',
+                    'rowSpan',
+                    'colSpan'
+                ],
+                td: [
+                    ...(defaultSchema.attributes?.td || []),
+                    'align',
+                    'className',
+                    'rowspan',
+                    'colspan',
+                    'rowSpan',
+                    'colSpan'
+                ],
                 iframe: [
                     'src',
                     'scrolling',
@@ -138,7 +157,6 @@ async function getProcessor() {
                     node.children = node.children.slice(1);
                     return label || '';
                 };
-
                 visit(tree, node => {
                     if (node.type === 'textDirective' || node.type === 'leafDirective') {
                         node.type = 'text';
@@ -154,7 +172,6 @@ async function getProcessor() {
                         const data = node.data || (node.data = {});
                         const attributes = node.attributes || {};
                         const name = node.name;
-                        const label = extractDirectiveLabel(node);
 
                         if (name === 'align') {
                             const align =
@@ -162,6 +179,7 @@ async function getProcessor() {
                             data.hName = 'div';
                             data.hProperties = { className: [`md-align-${align}`] };
                         } else if (name === 'epigraph') {
+                            const label = extractDirectiveLabel(node);
                             const author = attributes.author || label || '';
                             data.hName = 'div';
                             data.hProperties = {
@@ -169,17 +187,53 @@ async function getProcessor() {
                                 'data-author': author
                             };
                         } else if (['info', 'warning', 'success', 'error'].includes(name)) {
-                            const title = attributes.title || label || name.toUpperCase();
+                            const hasLabel = Boolean(
+                                !attributes.title && node.children?.[0]?.data?.directiveLabel
+                            );
+                            const title = attributes.title || (hasLabel ? '' : name.toUpperCase());
                             const open = attributes.open !== undefined;
                             data.hName = 'div';
                             data.hProperties = {
-                                className: ['md-block', name],
+                                className: hasLabel
+                                    ? ['md-block', name, 'has-title-children']
+                                    : ['md-block', name],
                                 'data-title': title,
                                 'data-open': open.toString()
                             };
                         }
                     }
                 });
+            };
+        }
+
+        function remarkCuteTable() {
+            const addClass = (node: any, classToAdd: string) => {
+                node.data ||= {};
+                node.data.hProperties ||= {};
+                const className = node.data.hProperties.className || [];
+                node.data.hProperties.className = Array.isArray(className)
+                    ? [...className, classToAdd]
+                    : [className, classToAdd].filter(Boolean);
+            };
+
+            return (tree: any) => {
+                const children = tree.children || [];
+                for (let index = 0; index < children.length; index++) {
+                    const node = children[index];
+                    const next = children[index + 1];
+                    if (
+                        node?.type !== 'leafDirective' ||
+                        node.name !== 'cute-table' ||
+                        node.attributes?.tuack === undefined ||
+                        next?.type !== 'table'
+                    ) {
+                        continue;
+                    }
+
+                    addClass(next, 'cute-table');
+                    children.splice(index, 1);
+                    index--;
+                }
             };
         }
 
@@ -238,8 +292,8 @@ async function getProcessor() {
                         const classes = node.properties.className;
 
                         if (classes.includes('md-epigraph')) {
-                            const author = node.properties['data-author'] || '';
-                            delete node.properties['data-author'];
+                            const author = node.properties.dataAuthor || '';
+                            delete node.properties.dataAuthor;
                             const body = {
                                 type: 'element',
                                 tagName: 'div',
@@ -263,9 +317,19 @@ async function getProcessor() {
                         );
                         if (typeClass && classes.includes('md-block')) {
                             const title = node.properties['dataTitle'] || typeClass.toUpperCase();
+                            const useTitleChildren = classes.includes('has-title-children');
                             const open = node.properties['dataOpen'] === 'true';
+                            node.properties.className = classes.filter(
+                                (className: string) => className !== 'has-title-children'
+                            );
                             delete node.properties['dataTitle'];
                             delete node.properties['dataOpen'];
+
+                            const titleChildren = useTitleChildren
+                                ? node.children
+                                      .splice(0, 1)
+                                      .flatMap((child: any) => child.children || [child])
+                                : [{ type: 'text', value: title }];
 
                             const titleNode = {
                                 type: 'element',
@@ -275,7 +339,7 @@ async function getProcessor() {
                                     {
                                         type: 'element',
                                         tagName: 'span',
-                                        children: [{ type: 'text', value: title }]
+                                        children: titleChildren
                                     },
                                     {
                                         type: 'element',
@@ -307,16 +371,206 @@ async function getProcessor() {
             };
         }
 
+        function remarkTableMergeMarkers() {
+            const escapedMarkers: Record<string, string> = {
+                '\\^': '^',
+                '\\<': '<',
+                '\\>': '>',
+                '\\v': 'v'
+            };
+            const getCellText = (cell: any, source: string) => {
+                if (!cell?.children || cell.children.length !== 1) return null;
+                const child = cell.children[0];
+                if (child.type !== 'text') return null;
+                const start = child.position?.start?.offset;
+                const end = child.position?.end?.offset;
+                const raw =
+                    typeof start === 'number' && typeof end === 'number'
+                        ? source.slice(start, end)
+                        : child.value;
+                return { child, raw, value: child.value };
+            };
+            const hasNeighbor = (
+                rows: any[][],
+                rowIndex: number,
+                cellIndex: number,
+                marker: string
+            ) => {
+                switch (marker) {
+                    case '^':
+                        return rowIndex > 0 && Boolean(rows[rowIndex - 1]?.[cellIndex]);
+                    case '<':
+                        return cellIndex > 0 && Boolean(rows[rowIndex]?.[cellIndex - 1]);
+                    case '>':
+                        return Boolean(rows[rowIndex]?.[cellIndex + 1]);
+                    case 'v':
+                        return (
+                            rowIndex < rows.length - 1 && Boolean(rows[rowIndex + 1]?.[cellIndex])
+                        );
+                    default:
+                        return false;
+                }
+            };
+            return (tree: any, file: VFile) => {
+                const source = String(file.value || '');
+                visit(tree, 'table', (table: any) => {
+                    const rows: any[][] = (table.children || []).map(
+                        (row: any) => row.children || []
+                    );
+
+                    rows.forEach((row, rowIndex) => {
+                        row.forEach((cell, cellIndex) => {
+                            const text = getCellText(cell, source);
+                            if (!text) return;
+
+                            if (escapedMarkers[text.raw]) {
+                                text.child.value = escapedMarkers[text.raw];
+                                return;
+                            }
+
+                            if (
+                                text.value !== text.raw ||
+                                !hasNeighbor(rows, rowIndex, cellIndex, text.raw)
+                            ) {
+                                return;
+                            }
+
+                            cell.data ||= {};
+                            cell.data.hProperties ||= {};
+                            cell.data.hProperties['data-merge-marker'] = text.raw;
+                        });
+                    });
+                });
+            };
+        }
+
+        function rehypeApplyTableMerges() {
+            const getMarker = (cell: any) =>
+                cell.properties?.dataMergeMarker || cell.properties?.['data-merge-marker'];
+            const deleteMarker = (cell: any) => {
+                if (!cell.properties) return;
+                delete cell.properties.dataMergeMarker;
+                delete cell.properties['data-merge-marker'];
+            };
+            const addClass = (cell: any, classToAdd: string) => {
+                cell.properties ||= {};
+                const className = cell.properties.className || [];
+                const classes = Array.isArray(className) ? className : [className].filter(Boolean);
+                if (!classes.includes(classToAdd)) classes.push(classToAdd);
+                cell.properties.className = classes;
+            };
+            const getSpan = (cell: any, property: 'rowSpan' | 'colSpan') =>
+                Number(
+                    cell.properties?.[property] || cell.properties?.[property.toLowerCase()] || 1
+                );
+            const setSpan = (cell: any, property: 'rowSpan' | 'colSpan', value: number) => {
+                cell.properties ||= {};
+                cell.properties[property] = value;
+            };
+            const copyCell = (source: any, target: any) => {
+                target.tagName = source.tagName;
+                target.properties = { ...(source.properties || {}) };
+                target.children = source.children || [];
+                deleteMarker(target);
+            };
+
+            return (tree: any) => {
+                visit(tree, 'element', (table: any) => {
+                    if (table.tagName !== 'table') return;
+
+                    const rowNodes: any[] = [];
+                    visit(table, 'element', (row: any) => {
+                        if (row.tagName === 'tr') rowNodes.push(row);
+                    });
+                    const rows = rowNodes.map(row =>
+                        (row.children || []).filter(
+                            (child: any) =>
+                                child.type === 'element' &&
+                                (child.tagName === 'td' || child.tagName === 'th')
+                        )
+                    );
+                    const owners: any[][] = rows.map(row => row.map((cell: any) => cell));
+                    const removed = new WeakSet<object>();
+
+                    const ownerAt = (rowIndex: number, cellIndex: number) => {
+                        const owner = owners[rowIndex]?.[cellIndex];
+                        return owner && !removed.has(owner) ? owner : null;
+                    };
+                    const mergeInto = (
+                        markerCell: any,
+                        target: any,
+                        property: 'rowSpan' | 'colSpan'
+                    ) => {
+                        addClass(target, 'md-table-merged-cell');
+                        setSpan(target, property, getSpan(target, property) + 1);
+                        removed.add(markerCell);
+                    };
+
+                    rows.forEach((row: any[], rowIndex: number) => {
+                        row.forEach((cell: any, cellIndex: number) => {
+                            if (removed.has(cell)) return;
+                            const marker = getMarker(cell);
+                            if (!marker) return;
+
+                            if (marker === '^') {
+                                const target = ownerAt(rowIndex - 1, cellIndex);
+                                if (target) {
+                                    mergeInto(cell, target, 'rowSpan');
+                                    owners[rowIndex][cellIndex] = target;
+                                }
+                            } else if (marker === '<') {
+                                const target = ownerAt(rowIndex, cellIndex - 1);
+                                if (target) {
+                                    mergeInto(cell, target, 'colSpan');
+                                    owners[rowIndex][cellIndex] = target;
+                                }
+                            } else if (marker === '>') {
+                                const target = ownerAt(rowIndex, cellIndex + 1);
+                                if (target) {
+                                    copyCell(target, cell);
+                                    addClass(cell, 'md-table-merged-cell');
+                                    setSpan(cell, 'colSpan', getSpan(cell, 'colSpan') + 1);
+                                    removed.add(target);
+                                    owners[rowIndex][cellIndex] = cell;
+                                    owners[rowIndex][cellIndex + 1] = cell;
+                                }
+                            } else if (marker === 'v') {
+                                const target = ownerAt(rowIndex + 1, cellIndex);
+                                if (target) {
+                                    copyCell(target, cell);
+                                    addClass(cell, 'md-table-merged-cell');
+                                    setSpan(cell, 'rowSpan', getSpan(cell, 'rowSpan') + 1);
+                                    removed.add(target);
+                                    owners[rowIndex][cellIndex] = cell;
+                                    owners[rowIndex + 1][cellIndex] = cell;
+                                }
+                            }
+                        });
+                    });
+
+                    rows.flat().forEach(deleteMarker);
+                    rowNodes.forEach(row => {
+                        row.children = (row.children || []).filter(
+                            (child: any) => !(child.type === 'element' && removed.has(child))
+                        );
+                    });
+                });
+            };
+        }
+
         return unified()
             .use(remarkParse)
             .use(remarkGfm)
             .use(remarkMath)
             .use(remarkSmartypants)
             .use(remarkDirective)
+            .use(remarkCuteTable)
             .use(remarkCustomContainers)
+            .use(remarkTableMergeMarkers)
             .use(remarkBV)
             .use(remarkRehype, { allowDangerousHtml: true })
             .use(rehypeRaw)
+            .use(rehypeApplyTableMerges)
             .use(rehypeSanitize, schema)
             .use(rehypeSlug)
             .use(rehypeAutolinkHeadings, {
@@ -373,8 +627,6 @@ export default async function renderMarkdown(src: string) {
 
 function replaceUI(s: string) {
     return s
-        .split('<table>')
-        .join('<div class="table-container"><table>')
-        .split('</table>')
-        .join('</table></div>');
+        .replace(/<table(\s[^>]*)?>/g, '<div class="table-container"><table$1>')
+        .replace(/<\/table>/g, '</table></div>');
 }
