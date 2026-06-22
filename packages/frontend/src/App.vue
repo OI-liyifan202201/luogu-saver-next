@@ -3,7 +3,7 @@
     <n-config-provider :theme-overrides="themeOverrides">
         <n-message-provider>
             <n-space vertical>
-                <n-layout has-sider>
+                <n-layout has-sider :style="themeCssVars">
                     <n-layout-sider
                         class="app-sider"
                         bordered
@@ -104,7 +104,7 @@
                                                 <p class="footer-element right-aligned">
                                                     <Icon><Code /></Icon>
                                                     <span>
-                                                        开发者：Federico2903 & Murasame & quanac-lcx
+                                                        开发者：Federico2903 & Murasame & quanac-lcx & <a href="https://github.com/Ark-Aak/luogu-saver-next/graphs/contributors" target="_blank">其他贡献者</a>
                                                     </span>
                                                 </p>
                                                 <p class="footer-element right-aligned">
@@ -384,7 +384,7 @@ const menuOptions = computed<MenuOption[]>(() => [
 import { THEME_STORAGE_KEY } from '@/utils/constants.ts';
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
 const themeStorage = useLocalStorage(THEME_STORAGE_KEY, defaultTheme);
-const uiThemeVars = ref<UiThemeVars>(themeStorage.value as UiThemeVars);
+const uiThemeVars = ref<UiThemeVars>({ ...defaultTheme, ...(themeStorage.value as Partial<UiThemeVars>) });
 
 provide(uiThemeKey, uiThemeVars);
 
@@ -416,20 +416,61 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
             primaryColorHover: uiThemeVars.value.primaryColorHover,
             primaryColorPressed: uiThemeVars.value.primaryColorPressed,
             primaryColorSuppl: uiThemeVars.value.primaryColorSuppl,
-            cardColor: uiThemeVars.value.cardColor
+            cardColor: uiThemeVars.value.cardColor,
+            textColor1: uiThemeVars.value.textColor,
+            textColor2: uiThemeVars.value.secondaryTextColor,
+            textColor3: uiThemeVars.value.mutedTextColor,
+            dividerColor: uiThemeVars.value.borderColor
         },
         Layout: {
             color: uiThemeVars.value.bodyColor,
-            siderColor: 'rgba(255, 255, 255, 0.78)'
+            siderColor: uiThemeVars.value.translucentCardColor
         },
         Menu: {
             itemTextColorActive: uiThemeVars.value.primaryColor,
             itemIconColorActive: uiThemeVars.value.primaryColor,
-            itemColorActive: 'rgba(22, 119, 255, 0.1)',
-            itemColorActiveHover: 'rgba(22, 119, 255, 0.14)',
-            itemColorHover: 'rgba(22, 119, 255, 0.08)',
+            itemColorActive: uiThemeVars.value.panelColor,
+            itemColorActiveHover: uiThemeVars.value.panelColor,
+            itemColorHover: uiThemeVars.value.panelColor,
             borderRadius: uiThemeVars.value.cardRadius
         }
+    };
+});
+
+const themeCssVars = computed(() => {
+    const vars = uiThemeVars.value;
+    return {
+        '--ui-body-color': vars.bodyColor,
+        '--ui-body-gradient-start': vars.bodyGradientStart,
+        '--ui-body-gradient-end': vars.bodyGradientEnd,
+        '--ui-primary-color': vars.primaryColor,
+        '--ui-primary-color-hover': vars.primaryColorHover,
+        '--ui-primary-color-pressed': vars.primaryColorPressed,
+        '--ui-primary-color-suppl': vars.primaryColorSuppl,
+        '--ui-card-color': vars.cardColor,
+        '--ui-translucent-card-color': vars.translucentCardColor,
+        '--ui-card-title-color': vars.cardTitleColor,
+        '--ui-text-color': vars.textColor,
+        '--ui-secondary-text-color': vars.secondaryTextColor,
+        '--ui-muted-text-color': vars.mutedTextColor,
+        '--ui-border-color': vars.borderColor,
+        '--ui-panel-color': vars.panelColor,
+        '--ui-code-background-color': vars.codeBackgroundColor,
+        '--ui-code-text-color': vars.codeTextColor,
+        '--ui-card-shadow': vars.cardShadow,
+        '--ui-elevated-shadow': vars.elevatedShadow,
+        '--ui-card-radius': vars.cardRadius,
+        '--ui-icon-color': vars.iconColor,
+        '--ui-user-red-color': vars.userRedColor,
+        '--ui-user-orange-color': vars.userOrangeColor,
+        '--ui-user-purple-color': vars.userPurpleColor,
+        '--ui-user-green-color': vars.userGreenColor,
+        '--ui-user-blue-color': vars.userBlueColor,
+        '--ui-user-gray-color': vars.userGrayColor,
+        '--ui-user-cheater-color': vars.userCheaterColor,
+        '--ui-prize-green-color': vars.prizeGreenColor,
+        '--ui-prize-blue-color': vars.prizeBlueColor,
+        '--ui-prize-gold-color': vars.prizeGoldColor
     };
 });
 
@@ -455,14 +496,14 @@ setInterval(() => {
 
 .app-main {
     background:
-        radial-gradient(circle at top left, rgba(22, 119, 255, 0.12), transparent 34vw),
-        linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+        radial-gradient(circle at top left, var(--ui-panel-color), transparent 34vw),
+        linear-gradient(180deg, var(--ui-body-gradient-start) 0%, var(--ui-body-gradient-end) 100%);
 }
 
 .app-sider {
-    border-right: 1px solid rgba(22, 119, 255, 0.1) !important;
+    border-right: 1px solid var(--ui-border-color) !important;
     backdrop-filter: blur(18px);
-    box-shadow: 12px 0 32px rgba(15, 70, 130, 0.06);
+    box-shadow: var(--ui-card-shadow);
 }
 
 .brand-shell {
@@ -471,18 +512,18 @@ setInterval(() => {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    border-bottom: 1px solid rgba(22, 119, 255, 0.08);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(233, 245, 255, 0.52));
+    border-bottom: 1px solid var(--ui-border-color);
+    background: var(--ui-translucent-card-color);
 }
 
 .brand-logo {
-    color: #2f6db5;
+    color: var(--ui-icon-color);
     font-size: 32px;
     flex-shrink: 0;
 }
 
 .brand-text {
-    color: #10233f;
+    color: var(--ui-card-title-color);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -492,7 +533,7 @@ setInterval(() => {
 .app-footer {
     margin: 28px -28px -28px -28px;
     padding: 14px 40px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--ui-translucent-card-color);
     backdrop-filter: blur(16px);
 }
 
@@ -517,7 +558,7 @@ setInterval(() => {
     text-decoration: none;
 }
 .footer-link:hover {
-    color: #337ab7 !important;
+    color: var(--ui-primary-color-hover) !important;
 }
 .footer-link:not(:first-child) {
     margin-left: 16px;

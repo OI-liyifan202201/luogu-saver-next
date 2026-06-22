@@ -1,39 +1,35 @@
 /*fixed from https://cdn.luogu.com.cn/css/luogu3.css?ver=20190102 prefix: lg-fg-* */
 
 .user-Red {
-    color: #e74c3c !important;
+    color: var(--ui-user-red-color) !important;
 }
 .user-Orange {
-    color: #e67e22 !important;
+    color: var(--ui-user-orange-color) !important;
 }
 .user-Purple {
-    color: #8e44ad !important;
+    color: var(--ui-user-purple-color) !important;
 }
 .user-Green {
-    color: #2ecc71 !important;
-    color: #5eb95e !important;
+    color: var(--ui-user-green-color) !important;
 }
 .user-Blue {
-    color: #3498db !important;
-    color: #0e90d2 !important;
+    color: var(--ui-user-blue-color) !important;
 	/*note: in luogu homepage, blue using "bluelight"*/
 }
 .user-Gray {
-    color: #7f8c8d !important;
-    color: #bbb !important;
+    color: var(--ui-user-gray-color) !important;
 }
 .user-Cheater {
-    color: #ad8b00 !important;
-    color: #996600 !important;
+    color: var(--ui-user-cheater-color) !important;
 }
 
 :not(pre) > code {
-    background: #f1f5f9 !important;
+    background: var(--ui-code-background-color) !important;
     padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid #e2e8f0 !important;
+    border-radius: var(--ui-card-radius) !important;
+    border: 1px solid var(--ui-border-color) !important;
     font-size: 0.85em !important;
-    color: #e11d48 !important;
+    color: var(--ui-code-text-color) !important;
 }
 
 :root {

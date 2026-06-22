@@ -117,7 +117,8 @@ async function askRag() {
 }
 
 function openArticle(id: string) {
-    router.push(`/article/${id}`);
+    const { href } = router.resolve(`/article/${id}`);
+    window.open(href, '_blank');
 }
 
 function createProgressSteps(): ProgressStep[] {
