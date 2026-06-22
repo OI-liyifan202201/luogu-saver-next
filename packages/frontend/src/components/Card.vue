@@ -137,7 +137,7 @@ const showHeader = computed(() => {
     align-items: center;
     justify-content: center;
     border-radius: var(--ui-card-radius);
-    background: var(--ui-panel-color);
+    background: var(--ui-mark-background-color);
 }
 
 .card-title {

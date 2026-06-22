@@ -155,7 +155,7 @@ onMounted(processContent);
     top: 8px;
     right: 8px;
     padding: 4px 6px;
-    background: var(--ui-translucent-card-color);
+    background: var(--ui-copy-button-background-color);
     backdrop-filter: blur(4px);
     border: none;
     border-radius: var(--ui-card-radius);
@@ -167,7 +167,7 @@ onMounted(processContent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--ui-text-color);
+    color: var(--ui-copy-button-text-color);
     box-shadow: var(--ui-elevated-shadow);
     z-index: 2;
 }
@@ -177,7 +177,7 @@ onMounted(processContent);
 }
 
 .md-body :deep(.copy-code-btn:hover) {
-    background: var(--ui-translucent-card-color);
+    background: var(--ui-copy-button-background-color);
     color: var(--ui-primary-color);
 }
 
