@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue';
+import { computed, inject, ref, watchEffect } from 'vue';
 import {
     NButton,
     NCollapse,
@@ -60,6 +60,17 @@ interface ColorEditorGroup {
 
 const showDrawer = ref(false);
 const defaultExpandedNames = ['main'];
+
+// 模式控制: auto | manual
+const mode = ref<'auto' | 'manual'>('auto');
+
+// 自动模式下跟随系统主题
+watchEffect(() => {
+    if (mode.value === 'auto') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        uiTheme.value = isDark ? { ...darkTheme } : { ...defaultTheme };
+    }
+});
 
 const radiusNumber = computed({
     get: () => Number.parseInt(uiTheme.value.cardRadius, 10) || 0,
@@ -221,71 +232,87 @@ const handleReset = () => {
         }"
     >
         <n-drawer-content title="主题编辑器" :style="{ '--n-color': uiTheme?.cardColor }">
-            <n-form
-                v-if="uiTheme"
-                class="theme-editor-form"
-                label-placement="top"
-                label-width="auto"
-                :model="uiTheme"
-            >
-                <n-collapse :default-expanded-names="defaultExpandedNames">
-                    <n-collapse-item title="主要" name="main">
-                        <n-form-item
-                            v-for="item in mainColorItems"
-                            :key="item.key"
-                            :label="item.label"
-                            :path="item.key"
-                        >
-                            <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
-                        </n-form-item>
-                        <n-form-item label="代码主题" path="codeTheme">
-                            <n-select
-                                v-model:value="uiTheme.codeTheme"
-                                :options="codeThemeOptions"
-                            />
-                        </n-form-item>
-                    </n-collapse-item>
+            <n-form-item label="配色模式" class="mode-selector">
+                <n-select
+                    v-model:value="mode"
+                    :options="[
+                        { label: '跟随系统', value: 'auto' },
+                        { label: '手动配置', value: 'manual' }
+                    ]"
+                />
+            </n-form-item>
 
-                    <n-collapse-item
-                        v-for="group in advancedColorGroups"
-                        :key="group.name"
-                        :title="group.title"
-                        :name="group.name"
-                    >
-                        <n-form-item
-                            v-for="item in group.items"
-                            :key="item.key"
-                            :label="item.label"
-                            :path="item.key"
-                        >
-                            <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
-                        </n-form-item>
-                    </n-collapse-item>
+            <div class="editor-content" :class="{ disabled: mode === 'auto' }">
+                <n-form
+                    v-if="uiTheme"
+                    class="theme-editor-form"
+                    label-placement="top"
+                    label-width="auto"
+                    :model="uiTheme"
+                >
+                    <n-collapse :default-expanded-names="defaultExpandedNames">
+                        <n-collapse-item title="主要" name="main">
+                            <n-form-item
+                                v-for="item in mainColorItems"
+                                :key="item.key"
+                                :label="item.label"
+                                :path="item.key"
+                            >
+                                <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
+                            </n-form-item>
+                            <n-form-item label="代码主题" path="codeTheme">
+                                <n-select
+                                    v-model:value="uiTheme.codeTheme"
+                                    :options="codeThemeOptions"
+                                />
+                            </n-form-item>
+                        </n-collapse-item>
 
-                    <n-collapse-item title="阴影与圆角" name="shape">
-                        <n-form-item label="卡片阴影" path="cardShadow">
-                            <n-input v-model:value="uiTheme.cardShadow" />
-                        </n-form-item>
-                        <n-form-item label="浮层阴影" path="elevatedShadow">
-                            <n-input v-model:value="uiTheme.elevatedShadow" />
-                        </n-form-item>
-                        <n-form-item label="聚焦阴影" path="focusRingShadow">
-                            <n-input v-model:value="uiTheme.focusRingShadow" />
-                        </n-form-item>
-                        <n-form-item label="卡片圆角">
-                            <n-input-number v-model:value="radiusNumber" :min="0" />
-                        </n-form-item>
-                        <n-form-item label="胶囊圆角">
-                            <n-input-number v-model:value="pillRadiusNumber" :min="0" />
-                        </n-form-item>
-                    </n-collapse-item>
-                </n-collapse>
-            </n-form>
+                        <n-collapse-item
+                            v-for="group in advancedColorGroups"
+                            :key="group.name"
+                            :title="group.title"
+                            :name="group.name"
+                        >
+                            <n-form-item
+                                v-for="item in group.items"
+                                :key="item.key"
+                                :label="item.label"
+                                :path="item.key"
+                            >
+                                <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
+                            </n-form-item>
+                        </n-collapse-item>
+
+                        <n-collapse-item title="阴影与圆角" name="shape">
+                            <n-form-item label="卡片阴影" path="cardShadow">
+                                <n-input v-model:value="uiTheme.cardShadow" />
+                            </n-form-item>
+                            <n-form-item label="浮层阴影" path="elevatedShadow">
+                                <n-input v-model:value="uiTheme.elevatedShadow" />
+                            </n-form-item>
+                            <n-form-item label="聚焦阴影" path="focusRingShadow">
+                                <n-input v-model:value="uiTheme.focusRingShadow" />
+                            </n-form-item>
+                            <n-form-item label="卡片圆角">
+                                <n-input-number v-model:value="radiusNumber" :min="0" />
+                            </n-form-item>
+                            <n-form-item label="胶囊圆角">
+                                <n-input-number v-model:value="pillRadiusNumber" :min="0" />
+                            </n-form-item>
+                        </n-collapse-item>
+                    </n-collapse>
+                </n-form>
+            </div>
 
             <template #footer>
                 <n-space justify="end">
-                    <n-button type="warning" ghost @click="handleReset">选用默认浅色</n-button>
-                    <n-button type="warning" ghost @click="handleResetDark">选用默认深色</n-button>
+                    <template v-if="mode === 'manual'">
+                        <n-button type="warning" ghost @click="handleReset">选用默认浅色</n-button>
+                        <n-button type="warning" ghost @click="handleResetDark"
+                            >选用默认深色</n-button
+                        >
+                    </template>
                 </n-space>
             </template>
         </n-drawer-content>
@@ -298,6 +325,16 @@ const handleReset = () => {
     right: 20px;
     bottom: 20px;
     z-index: 1000;
+}
+
+.mode-selector {
+    margin-bottom: 16px;
+}
+
+.editor-content.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
 }
 
 .theme-editor-form :deep(.n-collapse-item__content-inner) {
