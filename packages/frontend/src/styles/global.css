@@ -14,7 +14,7 @@
 }
 .user-Blue {
     color: var(--ui-user-blue-color) !important;
-	/*note: in luogu homepage, blue using "bluelight"*/
+    /*note: in luogu homepage, blue using "bluelight"*/
 }
 .user-Gray {
     color: var(--ui-user-gray-color) !important;
@@ -51,7 +51,8 @@
 }
 
 .n-input:not(.n-input--disabled).n-input--focus .n-input__state-border,
-.n-base-selection:not(.n-base-selection--disabled).n-base-selection--active .n-base-selection__state-border {
+.n-base-selection:not(.n-base-selection--disabled).n-base-selection--active
+    .n-base-selection__state-border {
     border-color: var(--ui-control-border-focus-color, currentColor) !important;
     box-shadow: var(--ui-focus-ring-shadow, none) !important;
 }
@@ -75,6 +76,70 @@
 
 .n-space {
     color: inherit;
+}
+
+.n-dialog {
+    background-color: var(--ui-card-color) !important;
+    color: var(--ui-text-color) !important;
+    border: 1px solid var(--ui-border-color) !important;
+    border-radius: var(--ui-card-radius) !important;
+    box-shadow: var(--ui-elevated-shadow) !important;
+}
+
+.n-dialog .n-dialog__title {
+    color: var(--ui-card-title-color) !important;
+}
+
+.n-dialog .n-dialog__content {
+    color: var(--ui-text-color) !important;
+}
+
+.n-dialog .n-dialog__close,
+.n-dialog .n-dialog-icon {
+    color: var(--ui-icon-color) !important;
+}
+
+.n-alert {
+    background-color: var(--ui-panel-color) !important;
+    color: var(--ui-text-color) !important;
+    border-color: var(--ui-border-color) !important;
+}
+
+.n-alert .n-alert-body__title {
+    color: var(--ui-card-title-color) !important;
+}
+
+.n-alert .n-alert-body__content {
+    color: var(--ui-text-color) !important;
+}
+
+.n-alert a {
+    color: var(--ui-primary-color) !important;
+}
+
+.n-pagination .n-pagination-item {
+    background-color: var(--ui-control-color) !important;
+    color: var(--ui-control-text-color) !important;
+    border-color: var(--ui-control-border-color) !important;
+}
+
+.n-pagination .n-pagination-item:hover {
+    background-color: var(--ui-control-color-focus) !important;
+    color: var(--ui-primary-color-hover) !important;
+    border-color: var(--ui-control-border-hover-color) !important;
+}
+
+.n-pagination .n-pagination-item--active {
+    background-color: var(--ui-primary-color) !important;
+    color: #ffffff !important;
+    border-color: var(--ui-primary-color) !important;
+}
+
+.n-pagination .n-pagination-item--disabled,
+.n-pagination .n-pagination-item--button.n-pagination-item--disabled {
+    background-color: var(--ui-control-color-disabled) !important;
+    color: var(--ui-muted-text-color) !important;
+    border-color: var(--ui-border-color) !important;
 }
 
 .n-slider .n-slider-rail {
@@ -146,19 +211,26 @@
 .shiki,
 .shiki span {
     color: var(--shiki-light);
-    /*background-color: var(--shiki-light-bg);*/
     font-style: var(--shiki-light-font-style);
     font-weight: var(--shiki-light-font-weight);
     text-decoration: var(--shiki-light-text-decoration);
 }
 
-/*
-html.dark .shiki,
-html.dark .shiki span {
-	color: var(--shiki-dark);
-	background-color: var(--shiki-dark-bg);
-	font-style: var(--shiki-dark-font-style);
-	font-weight: var(--shiki-dark-font-weight);
-	text-decoration: var(--shiki-dark-text-decoration);
+.shiki {
+    background-color: var(--shiki-light-bg, var(--ui-code-background-color)) !important;
 }
-*/
+
+html[data-ui-code-theme='dark'] .shiki,
+html[data-ui-code-theme='dark'] .shiki span,
+[data-ui-code-theme='dark'] .shiki,
+[data-ui-code-theme='dark'] .shiki span {
+    color: var(--shiki-dark);
+    font-style: var(--shiki-dark-font-style);
+    font-weight: var(--shiki-dark-font-weight);
+    text-decoration: var(--shiki-dark-text-decoration);
+}
+
+html[data-ui-code-theme='dark'] .shiki,
+[data-ui-code-theme='dark'] .shiki {
+    background-color: var(--shiki-dark-bg, var(--ui-code-background-color)) !important;
+}

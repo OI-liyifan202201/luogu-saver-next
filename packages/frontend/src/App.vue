@@ -1,9 +1,19 @@
 <!--suppress ALL -->
 <template>
     <n-config-provider :theme-overrides="themeOverrides">
-        <n-message-provider>
+        <n-message-provider :theme-overrides="themeOverrides.Message">
             <n-space vertical>
-                <n-layout has-sider :style="themeCssVars">
+                <n-layout
+                    class="app-shell"
+                    :class="{ 'mobile-sider-open': mobileSiderOpen }"
+                    has-sider
+                    :style="themeCssVars"
+                    :data-ui-code-theme="uiThemeVars.codeTheme"
+                    @touchstart.passive="handleTouchStart"
+                    @touchend.passive="handleTouchEnd"
+                    @pointerdown.passive="handlePointerStart"
+                    @pointerup.passive="handlePointerEnd"
+                >
                     <n-layout-sider
                         class="app-sider"
                         bordered
@@ -33,7 +43,13 @@
                         />
                     </n-layout-sider>
 
-                    <n-dialog-provider>
+                    <div
+                        v-if="mobileSiderOpen"
+                        class="mobile-sider-backdrop"
+                        @click="closeMobileSider"
+                    ></div>
+
+                    <n-dialog-provider :theme-overrides="themeOverrides.Dialog">
                         <n-layout class="app-main" :native-scrollbar="false">
                             <n-layout-content content-style="padding: 28px;">
                                 <div class="router-view">
@@ -90,7 +106,7 @@
                                                 </p>
                                                 <p class="footer-element">
                                                     <a
-                                                        href="https://github.com/Ark-Aak/luogu-saver/graphs/contributors"
+                                                        href="https://github.com/Ark-Aak/luogu-saver-next/graphs/contributors"
                                                         class="footer-link"
                                                     >
                                                         <Icon>
@@ -104,7 +120,13 @@
                                                 <p class="footer-element right-aligned">
                                                     <Icon><Code /></Icon>
                                                     <span>
-                                                        开发者：Federico2903 & Murasame & quanac-lcx & <a href="https://github.com/Ark-Aak/luogu-saver-next/graphs/contributors" target="_blank">其他贡献者</a>
+                                                        开发者：Federico2903 & Murasame & quanac-lcx
+                                                        &
+                                                        <a
+                                                            href="https://github.com/Ark-Aak/luogu-saver-next/graphs/contributors"
+                                                            target="_blank"
+                                                            >其他贡献者</a
+                                                        >
                                                     </span>
                                                 </p>
                                                 <p class="footer-element right-aligned">
@@ -242,14 +264,21 @@ const activeKey = computed(
 );
 const collapsed = ref(true);
 const manualToggle = ref(false);
+const mobileSiderOpen = ref(false);
+const touchStartX = ref(0);
+const touchStartY = ref(0);
+
+const isMobileViewport = () => window.innerWidth <= 768;
 
 const handleMouseEnter = () => {
+    if (isMobileViewport()) return;
     if (collapsed.value && !manualToggle.value) {
         collapsed.value = false;
     }
 };
 
 const handleMouseLeave = () => {
+    if (isMobileViewport()) return;
     if (!collapsed.value && !manualToggle.value) {
         collapsed.value = true;
     }
@@ -263,6 +292,54 @@ const handleManualCollapse = () => {
 const handleManualExpand = () => {
     manualToggle.value = true;
     collapsed.value = false;
+    mobileSiderOpen.value = true;
+};
+
+const openMobileSider = () => {
+    if (!isMobileViewport()) return;
+    mobileSiderOpen.value = true;
+    collapsed.value = false;
+};
+
+const closeMobileSider = () => {
+    if (!isMobileViewport()) return;
+    mobileSiderOpen.value = false;
+    collapsed.value = true;
+};
+
+const handleTouchStart = (event: TouchEvent) => {
+    const touch = event.changedTouches[0];
+    touchStartX.value = touch.clientX;
+    touchStartY.value = touch.clientY;
+};
+
+const handleSwipeEnd = (clientX: number, clientY: number) => {
+    const deltaX = clientX - touchStartX.value;
+    const deltaY = Math.abs(clientY - touchStartY.value);
+    if (deltaY > 48) return;
+
+    if (!mobileSiderOpen.value && touchStartX.value <= 28 && deltaX > 64) {
+        openMobileSider();
+        return;
+    }
+
+    if (mobileSiderOpen.value && deltaX < -64) {
+        closeMobileSider();
+    }
+};
+
+const handleTouchEnd = (event: TouchEvent) => {
+    const touch = event.changedTouches[0];
+    handleSwipeEnd(touch.clientX, touch.clientY);
+};
+
+const handlePointerStart = (event: PointerEvent) => {
+    touchStartX.value = event.clientX;
+    touchStartY.value = event.clientY;
+};
+
+const handlePointerEnd = (event: PointerEvent) => {
+    handleSwipeEnd(event.clientX, event.clientY);
 };
 
 const canShowAdminMenu = computed(() =>
@@ -384,7 +461,26 @@ const menuOptions = computed<MenuOption[]>(() => [
 import { THEME_STORAGE_KEY } from '@/utils/constants.ts';
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
 const themeStorage = useLocalStorage(THEME_STORAGE_KEY, defaultTheme);
-const uiThemeVars = ref<UiThemeVars>({ ...defaultTheme, ...(themeStorage.value as Partial<UiThemeVars>) });
+type StoredUiThemeVars = Partial<UiThemeVars> & { codeRenderFilter?: string };
+
+const normalizeThemeVars = (storedTheme: StoredUiThemeVars | null): UiThemeVars => {
+    const themeWithoutLegacyFilter = { ...(storedTheme ?? {}) };
+    delete themeWithoutLegacyFilter.codeRenderFilter;
+
+    return {
+        ...defaultTheme,
+        ...themeWithoutLegacyFilter,
+        codeTheme:
+            storedTheme?.codeTheme ??
+            (storedTheme?.codeRenderFilter && storedTheme.codeRenderFilter !== 'none'
+                ? 'dark'
+                : defaultTheme.codeTheme)
+    };
+};
+
+const uiThemeVars = ref<UiThemeVars>(
+    normalizeThemeVars(themeStorage.value as StoredUiThemeVars | null)
+);
 
 provide(uiThemeKey, uiThemeVars);
 
@@ -426,7 +522,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         },
         Layout: {
             color: uiThemeVars.value.bodyColor,
-            siderColor: uiThemeVars.value.translucentCardColor
+            siderColor: uiThemeVars.value.cardColor
         },
         Menu: {
             itemTextColorActive: uiThemeVars.value.primaryColor,
@@ -535,6 +631,95 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
             textColorError: uiThemeVars.value.errorColor,
             colorError: uiThemeVars.value.controlTagColor
         },
+        Button: {
+            color: uiThemeVars.value.controlColor,
+            colorHover: uiThemeVars.value.controlColorFocus,
+            colorPressed: uiThemeVars.value.panelColor,
+            colorFocus: uiThemeVars.value.controlColorFocus,
+            colorDisabled: uiThemeVars.value.controlColorDisabled,
+            textColor: uiThemeVars.value.controlTextColor,
+            textColorHover: uiThemeVars.value.primaryColorHover,
+            textColorPressed: uiThemeVars.value.primaryColorPressed,
+            textColorFocus: uiThemeVars.value.primaryColor,
+            textColorDisabled: uiThemeVars.value.mutedTextColor,
+            border: `1px solid ${uiThemeVars.value.controlBorderColor}`,
+            borderHover: `1px solid ${uiThemeVars.value.controlBorderHoverColor}`,
+            borderPressed: `1px solid ${uiThemeVars.value.controlBorderFocusColor}`,
+            borderFocus: `1px solid ${uiThemeVars.value.controlBorderFocusColor}`,
+            borderDisabled: `1px solid ${uiThemeVars.value.borderColor}`,
+            rippleColor: uiThemeVars.value.primaryColor,
+            colorPrimary: uiThemeVars.value.primaryColor,
+            colorHoverPrimary: uiThemeVars.value.primaryColorHover,
+            colorPressedPrimary: uiThemeVars.value.primaryColorPressed,
+            colorFocusPrimary: uiThemeVars.value.primaryColorHover,
+            textColorPrimary: '#ffffff',
+            textColorHoverPrimary: '#ffffff',
+            textColorPressedPrimary: '#ffffff',
+            textColorFocusPrimary: '#ffffff',
+            borderPrimary: `1px solid ${uiThemeVars.value.primaryColor}`,
+            borderHoverPrimary: `1px solid ${uiThemeVars.value.primaryColorHover}`,
+            borderPressedPrimary: `1px solid ${uiThemeVars.value.primaryColorPressed}`,
+            borderFocusPrimary: `1px solid ${uiThemeVars.value.primaryColorHover}`
+        },
+        Alert: {
+            color: uiThemeVars.value.panelColor,
+            colorInfo: uiThemeVars.value.panelColor,
+            colorSuccess: uiThemeVars.value.panelColor,
+            colorWarning: uiThemeVars.value.panelColor,
+            colorError: uiThemeVars.value.panelColor,
+            border: `1px solid ${uiThemeVars.value.borderColor}`,
+            borderInfo: `1px solid ${uiThemeVars.value.infoColor}`,
+            borderSuccess: `1px solid ${uiThemeVars.value.successColor}`,
+            borderWarning: `1px solid ${uiThemeVars.value.warningColor}`,
+            borderError: `1px solid ${uiThemeVars.value.errorColor}`,
+            titleTextColor: uiThemeVars.value.cardTitleColor,
+            contentTextColor: uiThemeVars.value.textColor,
+            iconColor: uiThemeVars.value.primaryColor,
+            iconColorInfo: uiThemeVars.value.infoColor,
+            iconColorSuccess: uiThemeVars.value.successColor,
+            iconColorWarning: uiThemeVars.value.warningColor,
+            iconColorError: uiThemeVars.value.errorColor
+        },
+        Dialog: {
+            color: uiThemeVars.value.cardColor,
+            textColor: uiThemeVars.value.textColor,
+            titleTextColor: uiThemeVars.value.cardTitleColor,
+            iconColor: uiThemeVars.value.primaryColor,
+            iconColorInfo: uiThemeVars.value.infoColor,
+            iconColorSuccess: uiThemeVars.value.successColor,
+            iconColorWarning: uiThemeVars.value.warningColor,
+            iconColorError: uiThemeVars.value.errorColor,
+            closeIconColor: uiThemeVars.value.iconColor,
+            closeIconColorHover: uiThemeVars.value.primaryColorHover,
+            closeIconColorPressed: uiThemeVars.value.primaryColorPressed,
+            boxShadow: uiThemeVars.value.elevatedShadow,
+            borderRadius: uiThemeVars.value.cardRadius
+        },
+        Pagination: {
+            itemColor: uiThemeVars.value.controlColor,
+            itemColorHover: uiThemeVars.value.controlColorFocus,
+            itemColorPressed: uiThemeVars.value.panelColor,
+            itemColorActive: uiThemeVars.value.primaryColor,
+            itemColorActiveHover: uiThemeVars.value.primaryColorHover,
+            itemColorDisabled: uiThemeVars.value.controlColorDisabled,
+            itemTextColor: uiThemeVars.value.controlTextColor,
+            itemTextColorHover: uiThemeVars.value.primaryColorHover,
+            itemTextColorPressed: uiThemeVars.value.primaryColorPressed,
+            itemTextColorActive: '#ffffff',
+            itemTextColorDisabled: uiThemeVars.value.mutedTextColor,
+            itemBorder: `1px solid ${uiThemeVars.value.controlBorderColor}`,
+            itemBorderHover: `1px solid ${uiThemeVars.value.controlBorderHoverColor}`,
+            itemBorderPressed: `1px solid ${uiThemeVars.value.controlBorderFocusColor}`,
+            itemBorderActive: `1px solid ${uiThemeVars.value.primaryColor}`,
+            itemBorderDisabled: `1px solid ${uiThemeVars.value.borderColor}`,
+            buttonColorHover: uiThemeVars.value.controlColorFocus,
+            buttonColorPressed: uiThemeVars.value.panelColor,
+            buttonColorDisabled: uiThemeVars.value.controlColorDisabled,
+            buttonIconColor: uiThemeVars.value.iconColor,
+            buttonIconColorHover: uiThemeVars.value.primaryColorHover,
+            buttonIconColorPressed: uiThemeVars.value.primaryColorPressed,
+            buttonIconColorDisabled: uiThemeVars.value.mutedTextColor
+        },
         Slider: {
             railColor: uiThemeVars.value.sliderRailColor,
             railColorHover: uiThemeVars.value.sliderRailHoverColor,
@@ -561,7 +746,36 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
             colorSuccess: uiThemeVars.value.cardColor,
             colorError: uiThemeVars.value.cardColor,
             colorWarning: uiThemeVars.value.cardColor,
-            colorLoading: uiThemeVars.value.cardColor
+            colorLoading: uiThemeVars.value.cardColor,
+            textColor: uiThemeVars.value.textColor,
+            textColorInfo: uiThemeVars.value.textColor,
+            textColorSuccess: uiThemeVars.value.textColor,
+            textColorError: uiThemeVars.value.textColor,
+            textColorWarning: uiThemeVars.value.textColor,
+            textColorLoading: uiThemeVars.value.textColor,
+            iconColor: uiThemeVars.value.primaryColor,
+            iconColorInfo: uiThemeVars.value.infoColor,
+            iconColorSuccess: uiThemeVars.value.successColor,
+            iconColorWarning: uiThemeVars.value.warningColor,
+            iconColorError: uiThemeVars.value.errorColor,
+            iconColorLoading: uiThemeVars.value.primaryColor,
+            loadingColor: uiThemeVars.value.primaryColor,
+            border: `1px solid ${uiThemeVars.value.borderColor}`,
+            boxShadow: uiThemeVars.value.elevatedShadow,
+            boxShadowInfo: uiThemeVars.value.elevatedShadow,
+            boxShadowSuccess: uiThemeVars.value.elevatedShadow,
+            boxShadowError: uiThemeVars.value.elevatedShadow,
+            boxShadowWarning: uiThemeVars.value.elevatedShadow,
+            boxShadowLoading: uiThemeVars.value.elevatedShadow
+        },
+        Skeleton: {
+            color: uiThemeVars.value.panelColor,
+            colorEnd: uiThemeVars.value.controlColorDisabled,
+            borderRadius: uiThemeVars.value.cardRadius
+        },
+        Spin: {
+            color: uiThemeVars.value.primaryColor,
+            textColor: uiThemeVars.value.textColor
         },
         Space: {
             gapSmall: '8px 8px',
@@ -612,7 +826,7 @@ const themeCssVars = computed(() => {
         '--ui-slider-handle-color': vars.sliderHandleColor,
         '--ui-code-background-color': vars.codeBackgroundColor,
         '--ui-code-text-color': vars.codeTextColor,
-        '--ui-code-render-filter': vars.codeRenderFilter,
+        '--ui-code-theme': vars.codeTheme,
         '--ui-inline-code-background-color': vars.inlineCodeBackgroundColor,
         '--ui-inline-code-text-color': vars.inlineCodeTextColor,
         '--ui-mark-background-color': vars.markBackgroundColor,
@@ -665,11 +879,13 @@ watch(
         Object.entries(vars).forEach(([key, value]) => {
             document.documentElement.style.setProperty(key, value);
         });
+        document.documentElement.dataset.uiCodeTheme = uiThemeVars.value.codeTheme;
     },
     { immediate: true }
 );
 
 const handleMenuSelect = (key: string) => {
+    closeMobileSider();
     if (key === 'home') {
         router.push('/');
     } else {
@@ -696,8 +912,9 @@ setInterval(() => {
 }
 
 .app-sider {
+    background: var(--ui-card-color) !important;
     border-right: 1px solid var(--ui-border-color) !important;
-    backdrop-filter: blur(18px);
+    backdrop-filter: none;
     box-shadow: var(--ui-card-shadow);
 }
 
@@ -708,7 +925,7 @@ setInterval(() => {
     justify-content: center;
     gap: 10px;
     border-bottom: 1px solid var(--ui-border-color);
-    background: var(--ui-translucent-card-color);
+    background: var(--ui-card-color);
 }
 
 .brand-logo {
@@ -766,12 +983,69 @@ setInterval(() => {
 }
 
 @media (max-width: 768px) {
+    .app-shell {
+        position: relative;
+    }
+
+    .app-sider {
+        position: fixed !important;
+        inset: 0 auto 0 0;
+        z-index: 1200;
+        width: 240px !important;
+        max-width: min(82vw, 240px);
+        transform: translateX(-100%);
+        transition: transform 0.24s ease;
+    }
+
+    .mobile-sider-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1190;
+        background: rgb(0 0 0 / 50%);
+        animation: mobile-backdrop-in 0.2s ease;
+    }
+
+    .mobile-sider-open .app-sider {
+        transform: translateX(0);
+    }
+
+    .app-main {
+        width: 100vw;
+    }
+
+    .app-main :deep(.n-layout-scroll-container) {
+        padding: 10px !important;
+    }
+
     :deep(.n-layout-content) {
-        padding: 16px !important;
+        padding: 0 !important;
+    }
+
+    :deep(.n-layout-toggle-bar) {
+        pointer-events: none;
+        border-color: var(--ui-border-color) !important;
+        background: transparent !important;
+        color: var(--ui-muted-text-color);
+        box-shadow: none !important;
+    }
+
+    :deep(.n-layout-toggle-bar .n-layout-toggle-bar__top),
+    :deep(.n-layout-toggle-bar .n-layout-toggle-bar__bottom) {
+        background-color: var(--ui-muted-text-color) !important;
     }
 
     .app-footer {
         padding: 12px 16px;
+        margin: 10px -10px -10px -10px;
+    }
+}
+
+@keyframes mobile-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
     }
 }
 </style>

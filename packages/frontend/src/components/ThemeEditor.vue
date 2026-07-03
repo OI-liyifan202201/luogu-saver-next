@@ -2,6 +2,8 @@
 import { computed, inject, ref } from 'vue';
 import {
     NButton,
+    NCollapse,
+    NCollapseItem,
     NColorPicker,
     NDrawer,
     NDrawerContent,
@@ -10,11 +12,12 @@ import {
     NIcon,
     NInput,
     NInputNumber,
-    NSwitch,
+    NSelect,
+    NSpace,
     useMessage
 } from 'naive-ui';
 import { Settings } from '@vicons/ionicons5';
-import { uiThemeKey } from '@/styles/theme/themeKeys.ts';
+import { uiThemeKey, type UiThemeVars } from '@/styles/theme/themeKeys.ts';
 import { defaultTheme, darkTheme } from '@/styles/theme/default-theme.ts';
 
 const uiTheme = inject(uiThemeKey);
@@ -24,7 +27,24 @@ if (!uiTheme) {
     throw new Error('ThemeEditor 必须在 provider 内部使用');
 }
 
+type ColorThemeKey = Exclude<
+    keyof UiThemeVars,
+    'codeTheme' | 'cardShadow' | 'elevatedShadow' | 'focusRingShadow' | 'cardRadius' | 'pillRadius'
+>;
+
+interface ColorEditorItem {
+    key: ColorThemeKey;
+    label: string;
+}
+
+interface ColorEditorGroup {
+    name: string;
+    title: string;
+    items: readonly ColorEditorItem[];
+}
+
 const showDrawer = ref(false);
+const defaultExpandedNames = ['main'];
 
 const radiusNumber = computed({
     get: () => Number.parseInt(uiTheme.value.cardRadius, 10) || 0,
@@ -40,90 +60,134 @@ const pillRadiusNumber = computed({
     }
 });
 
-const codeRenderInvert = computed({
-    get: () => uiTheme.value.codeRenderFilter !== 'none',
-    set: value => {
-        uiTheme.value.codeRenderFilter = value ? 'invert(1) hue-rotate(180deg)' : 'none';
+const codeThemeOptions = [
+    { label: '浅色代码主题', value: 'light' },
+    { label: '深色代码主题', value: 'dark' }
+];
+
+const mainColorItems = [
+    { key: 'bodyColor', label: '页面背景色' },
+    { key: 'bodyGradientStart', label: '页面渐变起始色' },
+    { key: 'bodyGradientEnd', label: '页面渐变结束色' },
+    { key: 'primaryColor', label: '主色' },
+    { key: 'cardColor', label: '卡片背景色' }
+] as const satisfies readonly ColorEditorItem[];
+
+const advancedColorGroups = [
+    {
+        name: 'layout',
+        title: '页面与布局',
+        items: [
+            { key: 'translucentCardColor', label: '半透明卡片背景色' },
+            { key: 'borderColor', label: '边框颜色' },
+            { key: 'panelColor', label: '面板背景色' },
+            { key: 'footerTextColor', label: '页脚文本色' },
+            { key: 'iconColor', label: '图标颜色' }
+        ]
+    },
+    {
+        name: 'text',
+        title: '文字与链接',
+        items: [
+            { key: 'cardTitleColor', label: '卡片标题颜色' },
+            { key: 'textColor', label: '正文颜色' },
+            { key: 'secondaryTextColor', label: '次要文字颜色' },
+            { key: 'mutedTextColor', label: '弱化文字颜色' },
+            { key: 'linkColor', label: '链接颜色' },
+            { key: 'linkHoverColor', label: '链接悬停颜色' }
+        ]
+    },
+    {
+        name: 'control',
+        title: '控件',
+        items: [
+            { key: 'controlColor', label: '控件背景色' },
+            { key: 'controlColorFocus', label: '控件聚焦背景色' },
+            { key: 'controlColorDisabled', label: '控件禁用背景色' },
+            { key: 'controlTextColor', label: '控件文字颜色' },
+            { key: 'controlPlaceholderColor', label: '控件占位文字颜色' },
+            { key: 'controlBorderColor', label: '控件边框颜色' },
+            { key: 'controlBorderHoverColor', label: '控件悬停边框颜色' },
+            { key: 'controlBorderFocusColor', label: '控件聚焦边框颜色' },
+            { key: 'controlTagColor', label: '控件标签背景色' },
+            { key: 'controlTagTextColor', label: '控件标签文字颜色' },
+            { key: 'sliderRailColor', label: '滑动条轨道色' },
+            { key: 'sliderRailHoverColor', label: '滑动条悬停轨道色' },
+            { key: 'sliderFillColor', label: '滑动条填充色' },
+            { key: 'sliderFillHoverColor', label: '滑动条悬停填充色' },
+            { key: 'sliderHandleColor', label: '滑动条手柄色' }
+        ]
+    },
+    {
+        name: 'markdown',
+        title: 'Markdown 与代码',
+        items: [
+            { key: 'codeBackgroundColor', label: '普通代码块背景色' },
+            { key: 'codeTextColor', label: '普通代码块文字颜色' },
+            { key: 'inlineCodeBackgroundColor', label: '行内代码背景色' },
+            { key: 'inlineCodeTextColor', label: '行内代码文字颜色' },
+            { key: 'markBackgroundColor', label: '标记背景色' },
+            { key: 'tableHeaderColor', label: '表头背景色' },
+            { key: 'scrollbarTrackColor', label: '滚动条轨道色' },
+            { key: 'scrollbarThumbColor', label: '滚动条滑块色' },
+            { key: 'copyButtonBackgroundColor', label: '复制按钮背景色' },
+            { key: 'copyButtonTextColor', label: '复制按钮文字颜色' }
+        ]
+    },
+    {
+        name: 'status',
+        title: '状态与强调',
+        items: [
+            { key: 'infoColor', label: '信息色' },
+            { key: 'successColor', label: '成功色' },
+            { key: 'warningColor', label: '警告色' },
+            { key: 'errorColor', label: '错误色' },
+            { key: 'orangeColor', label: '橙色强调' },
+            { key: 'cyanColor', label: '青色强调' },
+            { key: 'mutedAccentColor', label: '弱化强调色' },
+            { key: 'primaryColorHover', label: '主色悬停色' },
+            { key: 'primaryColorPressed', label: '主色按压色' },
+            { key: 'primaryColorSuppl', label: '补充主色' }
+        ]
+    },
+    {
+        name: 'user',
+        title: '用户与奖项',
+        items: [
+            { key: 'userRedColor', label: '红名用户颜色' },
+            { key: 'userOrangeColor', label: '橙名用户颜色' },
+            { key: 'userPurpleColor', label: '紫名用户颜色' },
+            { key: 'userGreenColor', label: '绿名用户颜色' },
+            { key: 'userBlueColor', label: '蓝名用户颜色' },
+            { key: 'userGrayColor', label: '灰名用户颜色' },
+            { key: 'userCheaterColor', label: '作弊用户颜色' },
+            { key: 'prizeGreenColor', label: '绿钩/气球颜色' },
+            { key: 'prizeBlueColor', label: '蓝钩/气球颜色' },
+            { key: 'prizeGoldColor', label: '金钩/气球颜色' }
+        ]
+    },
+    {
+        name: 'category',
+        title: '文章分类',
+        items: [
+            { key: 'categoryPersonalColor', label: '个人记录颜色' },
+            { key: 'categorySolutionColor', label: '题解颜色' },
+            { key: 'categoryTechColor', label: '科技工程颜色' },
+            { key: 'categoryAlgorithmColor', label: '算法理论颜色' },
+            { key: 'categoryLifeColor', label: '生活游记颜色' },
+            { key: 'categoryStudyColor', label: '学习文化课颜色' },
+            { key: 'categoryFunColor', label: '休闲娱乐颜色' },
+            { key: 'categoryChatColor', label: '闲话颜色' },
+            { key: 'categoryUnknownColor', label: '未知分类颜色' }
+        ]
     }
-});
+] as const satisfies readonly ColorEditorGroup[];
 
-const colorItems = [
-  ['bodyColor', '页面背景色 (bodyColor)'],
-  ['bodyGradientStart', '页面渐变起始色 (bodyGradientStart)'],
-  ['bodyGradientEnd', '页面渐变结束色 (bodyGradientEnd)'],
-  ['primaryColor', '主色 (primaryColor)'],
-  ['primaryColorHover', '主色悬停色 (primaryColorHover)'],
-  ['primaryColorPressed', '主色按压色 (primaryColorPressed)'],
-  ['primaryColorSuppl', '补充主色 (primaryColorSuppl)'],
-  ['cardColor', '卡片背景色 (cardColor)'],
-  ['translucentCardColor', '半透明卡片背景色 (translucentCardColor)'],
-  ['cardTitleColor', '卡片标题颜色 (cardTitleColor)'],
-  ['textColor', '文本颜色 (textColor)'],
-  ['secondaryTextColor', '次要文本颜色 (secondaryTextColor)'],
-  ['mutedTextColor', '弱化文本颜色 (mutedTextColor)'],
-  ['borderColor', '边框颜色 (borderColor)'],
-  ['panelColor', '面板背景色 (panelColor)'],
-  ['controlColor', '控件背景色 (controlColor)'],
-  ['controlColorFocus', '控件聚焦背景色 (controlColorFocus)'],
-  ['controlColorDisabled', '控件禁用背景色 (controlColorDisabled)'],
-  ['controlTextColor', '控件文本色 (controlTextColor)'],
-  ['controlPlaceholderColor', '控件占位文本色 (controlPlaceholderColor)'],
-  ['controlBorderColor', '控件边框色 (controlBorderColor)'],
-  ['controlBorderHoverColor', '控件悬停边框色 (controlBorderHoverColor)'],
-  ['controlBorderFocusColor', '控件聚焦边框色 (controlBorderFocusColor)'],
-  ['controlTagColor', '控件标签背景色 (controlTagColor)'],
-  ['controlTagTextColor', '控件标签文本色 (controlTagTextColor)'],
-  ['sliderRailColor', '滑动条轨道色 (sliderRailColor)'],
-  ['sliderRailHoverColor', '滑动条悬停轨道色 (sliderRailHoverColor)'],
-  ['sliderFillColor', '滑动条填充色 (sliderFillColor)'],
-  ['sliderFillHoverColor', '滑动条悬停填充色 (sliderFillHoverColor)'],
-  ['sliderHandleColor', '滑动条手柄色 (sliderHandleColor)'],
-  ['codeBackgroundColor', '代码背景色 (codeBackgroundColor)'],
-  ['codeTextColor', '代码文本颜色 (codeTextColor)'],
-  ['inlineCodeBackgroundColor', '行内代码背景色 (inlineCodeBackgroundColor)'],
-  ['inlineCodeTextColor', '行内代码文本色 (inlineCodeTextColor)'],
-  ['markBackgroundColor', '标记背景色 (markBackgroundColor)'],
-  ['tableHeaderColor', '表头背景色 (tableHeaderColor)'],
-  ['scrollbarTrackColor', '滚动条轨道色 (scrollbarTrackColor)'],
-  ['scrollbarThumbColor', '滚动条滑块色 (scrollbarThumbColor)'],
-  ['copyButtonBackgroundColor', '复制按钮背景色 (copyButtonBackgroundColor)'],
-  ['copyButtonTextColor', '复制按钮文本色 (copyButtonTextColor)'],
-  ['footerTextColor', '页脚文本色 (footerTextColor)'],
-  ['linkColor', '链接颜色 (linkColor)'],
-  ['linkHoverColor', '链接悬停色 (linkHoverColor)'],
-  ['infoColor', '信息色 (infoColor)'],
-  ['successColor', '成功色 (successColor)'],
-  ['warningColor', '警告色 (warningColor)'],
-  ['errorColor', '错误色 (errorColor)'],
-  ['orangeColor', '橙色强调 (orangeColor)'],
-  ['cyanColor', '青色强调 (cyanColor)'],
-  ['mutedAccentColor', '弱化强调色 (mutedAccentColor)'],
-  ['iconColor', '图标颜色 (iconColor)'],
-  ['userRedColor', '红名用户 (userRedColor)'],
-  ['userOrangeColor', '橙名用户 (userOrangeColor)'],
-  ['userPurpleColor', '紫名用户 (userPurpleColor)'],
-  ['userGreenColor', '绿名用户 (userGreenColor)'],
-  ['userBlueColor', '蓝名用户 (userBlueColor)'],
-  ['userGrayColor', '灰名用户 (userGrayColor)'],
-  ['userCheaterColor', '作弊用户 (userCheaterColor)'],
-  ['prizeGreenColor', '绿钩/气球 (prizeGreenColor)'],
-  ['prizeBlueColor', '蓝钩/气球 (prizeBlueColor)'],
-  ['prizeGoldColor', '金钩/气球 (prizeGoldColor)'],
-  ['categoryPersonalColor', '分类：个人记录 (categoryPersonalColor)'],
-  ['categorySolutionColor', '分类：题解 (categorySolutionColor)'],
-  ['categoryTechColor', '分类：科技工程 (categoryTechColor)'],
-  ['categoryAlgorithmColor', '分类：算法理论 (categoryAlgorithmColor)'],
-  ['categoryLifeColor', '分类：生活游记 (categoryLifeColor)'],
-  ['categoryStudyColor', '分类：学习文化课 (categoryStudyColor)'],
-  ['categoryFunColor', '分类：休闲娱乐 (categoryFunColor)'],
-  ['categoryChatColor', '分类：闲话 (categoryChatColor)'],
-  ['categoryUnknownColor', '分类：未知 (categoryUnknownColor)']
-] as const;
-
-const handleResetdark = () => {
+const handleResetDark = () => {
     uiTheme.value = { ...darkTheme };
     message.success('已重置为深色主题');
 };
+
 const handleReset = () => {
     uiTheme.value = { ...defaultTheme };
     message.success('已重置为浅色主题');
@@ -145,54 +209,85 @@ const handleReset = () => {
         </template>
     </n-button>
 
-    <n-drawer 
-        v-model:show="showDrawer" 
-        :width="380" 
+    <n-drawer
+        v-model:show="showDrawer"
+        :width="420"
         placement="right"
-        :theme-overrides="{ 
-            color: uiTheme?.cardColor,             
-            borderRadius: uiTheme?.cardRadius,     
-            boxShadow: uiTheme?.cardShadow,       
+        :theme-overrides="{
+            color: uiTheme?.cardColor,
+            borderRadius: uiTheme?.cardRadius,
+            boxShadow: uiTheme?.cardShadow,
             titleTextColor: uiTheme?.cardTitleColor,
-            textColor: uiTheme?.textColor          
+            textColor: uiTheme?.textColor
         }"
     >
         <n-drawer-content title="主题编辑器" :style="{ '--n-color': uiTheme?.cardColor }">
-            <n-form v-if="uiTheme" label-placement="top" label-width="auto" :model="uiTheme">
-                <n-form-item
-                    v-for="[key, label] in colorItems"
-                    :key="key"
-                    :label="label"
-                    :path="key"
-                >
-                    <n-color-picker v-model:value="uiTheme[key]" show-alpha />
-                </n-form-item>
-                <n-form-item label="Card shadow" path="cardShadow">
-                    <n-input v-model:value="uiTheme.cardShadow" />
-                </n-form-item>
-                <n-form-item label="Elevated shadow" path="elevatedShadow">
-                    <n-input v-model:value="uiTheme.elevatedShadow" />
-                </n-form-item>
-                <n-form-item label="Focus ring shadow" path="focusRingShadow">
-                    <n-input v-model:value="uiTheme.focusRingShadow" />
-                </n-form-item>
-                <n-form-item label="代码渲染反色">
-                    <n-switch v-model:value="codeRenderInvert" />
-                </n-form-item>
-                <n-form-item label="Code render filter" path="codeRenderFilter">
-                    <n-input v-model:value="uiTheme.codeRenderFilter" />
-                </n-form-item>
-                <n-form-item label="Radius">
-                    <n-input-number v-model:value="radiusNumber" :min="0" />
-                </n-form-item>
-                <n-form-item label="Pill radius">
-                    <n-input-number v-model:value="pillRadiusNumber" :min="0" />
-                </n-form-item>
+            <n-form
+                v-if="uiTheme"
+                class="theme-editor-form"
+                label-placement="top"
+                label-width="auto"
+                :model="uiTheme"
+            >
+                <n-collapse :default-expanded-names="defaultExpandedNames">
+                    <n-collapse-item title="主要" name="main">
+                        <n-form-item
+                            v-for="item in mainColorItems"
+                            :key="item.key"
+                            :label="item.label"
+                            :path="item.key"
+                        >
+                            <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
+                        </n-form-item>
+                        <n-form-item label="代码主题" path="codeTheme">
+                            <n-select
+                                v-model:value="uiTheme.codeTheme"
+                                :options="codeThemeOptions"
+                            />
+                        </n-form-item>
+                    </n-collapse-item>
+
+                    <n-collapse-item
+                        v-for="group in advancedColorGroups"
+                        :key="group.name"
+                        :title="group.title"
+                        :name="group.name"
+                    >
+                        <n-form-item
+                            v-for="item in group.items"
+                            :key="item.key"
+                            :label="item.label"
+                            :path="item.key"
+                        >
+                            <n-color-picker v-model:value="uiTheme[item.key]" show-alpha />
+                        </n-form-item>
+                    </n-collapse-item>
+
+                    <n-collapse-item title="阴影与圆角" name="shape">
+                        <n-form-item label="卡片阴影" path="cardShadow">
+                            <n-input v-model:value="uiTheme.cardShadow" />
+                        </n-form-item>
+                        <n-form-item label="浮层阴影" path="elevatedShadow">
+                            <n-input v-model:value="uiTheme.elevatedShadow" />
+                        </n-form-item>
+                        <n-form-item label="聚焦阴影" path="focusRingShadow">
+                            <n-input v-model:value="uiTheme.focusRingShadow" />
+                        </n-form-item>
+                        <n-form-item label="卡片圆角">
+                            <n-input-number v-model:value="radiusNumber" :min="0" />
+                        </n-form-item>
+                        <n-form-item label="胶囊圆角">
+                            <n-input-number v-model:value="pillRadiusNumber" :min="0" />
+                        </n-form-item>
+                    </n-collapse-item>
+                </n-collapse>
             </n-form>
 
             <template #footer>
-                <n-button type="warning" ghost @click="handleReset">选用默认浅色</n-button>
-                <n-button type="warning" ghost @click="handleResetdark">选用默认深色</n-button>
+                <n-space justify="end">
+                    <n-button type="warning" ghost @click="handleReset">选用默认浅色</n-button>
+                    <n-button type="warning" ghost @click="handleResetDark">选用默认深色</n-button>
+                </n-space>
             </template>
         </n-drawer-content>
     </n-drawer>
@@ -206,4 +301,7 @@ const handleReset = () => {
     z-index: 1000;
 }
 
+.theme-editor-form :deep(.n-collapse-item__content-inner) {
+    padding-top: 8px;
+}
 </style>

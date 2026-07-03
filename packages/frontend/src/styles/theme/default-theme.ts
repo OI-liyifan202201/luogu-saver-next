@@ -33,7 +33,7 @@ export const defaultTheme: UiThemeVars = {
     sliderHandleColor: '#ffffff',
     codeBackgroundColor: '#f1f5f9',
     codeTextColor: '#e11d48',
-    codeRenderFilter: 'none',
+    codeTheme: 'light',
     inlineCodeBackgroundColor: '#f1f5f9',
     inlineCodeTextColor: '#e11d48',
     markBackgroundColor: 'rgba(47, 109, 181, 0.14)',
@@ -79,7 +79,6 @@ export const defaultTheme: UiThemeVars = {
     categoryUnknownColor: '#95a5a6'
 };
 
-
 export const darkTheme: UiThemeVars = {
     bodyColor: '#0f1219',
     bodyGradientStart: '#131825',
@@ -113,7 +112,7 @@ export const darkTheme: UiThemeVars = {
     sliderHandleColor: '#e2e8f0',
     codeBackgroundColor: '#1e2536',
     codeTextColor: '#fb7185',
-    codeRenderFilter: 'invert(1) hue-rotate(180deg)',
+    codeTheme: 'dark',
     inlineCodeBackgroundColor: '#1e2536',
     inlineCodeTextColor: '#fb7185',
     markBackgroundColor: 'rgba(91, 155, 213, 0.18)',

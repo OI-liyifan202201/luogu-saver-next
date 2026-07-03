@@ -1,5 +1,7 @@
 import { type InjectionKey, type Ref } from 'vue';
 
+export type CodeTheme = 'light' | 'dark';
+
 export interface UiThemeVars {
     bodyColor: string;
     bodyGradientStart: string;
@@ -33,7 +35,7 @@ export interface UiThemeVars {
     sliderHandleColor: string;
     codeBackgroundColor: string;
     codeTextColor: string;
-    codeRenderFilter: string;
+    codeTheme: CodeTheme;
     inlineCodeBackgroundColor: string;
     inlineCodeTextColor: string;
     markBackgroundColor: string;

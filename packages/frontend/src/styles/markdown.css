@@ -219,13 +219,14 @@ pre {
     border-radius: var(--ui-card-radius);
     overflow-x: auto;
     counter-reset: line-number;
+    background: var(--ui-code-background-color);
+    color: var(--ui-code-text-color);
 }
 
 .shiki {
     padding: 15px;
     border-radius: var(--ui-card-radius);
     position: relative;
-    filter: var(--ui-code-render-filter);
 }
 
 .shiki span.line::before {
@@ -234,7 +235,7 @@ pre {
     display: inline-block;
     width: 2em;
     margin-right: 10px;
-    color: gray;
+    color: var(--ui-muted-text-color);
     text-align: right;
 }
 
@@ -242,7 +243,7 @@ pre {
     width: 100%;
     overflow-x: auto;
     margin: 2rem 0;
-    border-radius: var(--ui-card-radius);
+    border-radius: 10px;
     border: 1px solid var(--ui-border-color);
     background: var(--ui-card-color);
 }
@@ -254,7 +255,8 @@ pre {
 }
 
 pre:not(.shiki) {
-    filter: var(--ui-code-render-filter);
+    background: var(--ui-code-background-color);
+    color: var(--ui-code-text-color);
 }
 
 .toggle-btn {
@@ -291,11 +293,11 @@ a:hover {
 }
 .table-container::-webkit-scrollbar-track {
     background: var(--ui-scrollbar-track-color);
-    border-radius: var(--ui-card-radius);
+    border-radius: 4px;
 }
 .table-container::-webkit-scrollbar-thumb {
     background: var(--ui-scrollbar-thumb-color);
-    border-radius: var(--ui-card-radius);
+    border-radius: 4px;
     transition: background 0.3s ease;
 }
 .table-container::-webkit-scrollbar-thumb:hover {
