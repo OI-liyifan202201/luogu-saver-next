@@ -29,7 +29,22 @@ if (!uiTheme) {
 
 type ColorThemeKey = Exclude<
     keyof UiThemeVars,
-    'codeTheme' | 'cardShadow' | 'elevatedShadow' | 'focusRingShadow' | 'cardRadius' | 'pillRadius'
+    | 'codeTheme'
+    | 'cardShadow'
+    | 'elevatedShadow'
+    | 'focusRingShadow'
+    | 'cardRadius'
+    | 'pillRadius'
+    | 'userRedColor'
+    | 'userOrangeColor'
+    | 'userPurpleColor'
+    | 'userGreenColor'
+    | 'userBlueColor'
+    | 'userGrayColor'
+    | 'userCheaterColor'
+    | 'prizeGreenColor'
+    | 'prizeBlueColor'
+    | 'prizeGoldColor'
 >;
 
 interface ColorEditorItem {
@@ -148,22 +163,6 @@ const advancedColorGroups = [
             { key: 'primaryColorHover', label: '主色悬停色' },
             { key: 'primaryColorPressed', label: '主色按压色' },
             { key: 'primaryColorSuppl', label: '补充主色' }
-        ]
-    },
-    {
-        name: 'user',
-        title: '用户与奖项',
-        items: [
-            { key: 'userRedColor', label: '红名用户颜色' },
-            { key: 'userOrangeColor', label: '橙名用户颜色' },
-            { key: 'userPurpleColor', label: '紫名用户颜色' },
-            { key: 'userGreenColor', label: '绿名用户颜色' },
-            { key: 'userBlueColor', label: '蓝名用户颜色' },
-            { key: 'userGrayColor', label: '灰名用户颜色' },
-            { key: 'userCheaterColor', label: '作弊用户颜色' },
-            { key: 'prizeGreenColor', label: '绿钩/气球颜色' },
-            { key: 'prizeBlueColor', label: '蓝钩/气球颜色' },
-            { key: 'prizeGoldColor', label: '金钩/气球颜色' }
         ]
     },
     {

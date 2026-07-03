@@ -16,8 +16,12 @@ import type { PlazaArticle } from '@/types/article';
 import Card from '@/components/Card.vue';
 import CardTitle from '@/components/CardTitle.vue';
 import UserLink from '@/components/UserLink.vue';
-import { getCategoryColor, getCategoryIcon, getCategoryLabel } from '@/utils/article.ts';
-import { hexToRgba } from '@/utils/render.ts';
+import {
+    getCategoryIcon,
+    getCategoryLabel,
+    getCategoryTagStyle,
+    getTagStyle
+} from '@/utils/article.ts';
 
 const router = useRouter();
 
@@ -112,11 +116,8 @@ const goToDetail = (id: string) => {
                         <template #title-extra>
                             <n-tag
                                 v-if="article.reason === 'hot'"
-                                :color="{
-                                    textColor: 'var(--ui-orange-color)',
-                                    color: 'color-mix(in srgb, var(--ui-orange-color) 20%, transparent)',
-                                    borderColor: 'var(--ui-orange-color)'
-                                }"
+                                class="article-color-tag"
+                                :style="getTagStyle('var(--ui-orange-color)')"
                                 size="small"
                             >
                                 <template #icon>
@@ -126,11 +127,8 @@ const goToDetail = (id: string) => {
                             </n-tag>
                             <n-tag
                                 v-else-if="article.reason === 'vector'"
-                                :color="{
-                                    textColor: 'var(--ui-cyan-color)',
-                                    color: 'color-mix(in srgb, var(--ui-cyan-color) 20%, transparent)',
-                                    borderColor: 'var(--ui-cyan-color)'
-                                }"
+                                class="article-color-tag"
+                                :style="getTagStyle('var(--ui-cyan-color)')"
                                 size="small"
                             >
                                 <template #icon>
@@ -151,14 +149,8 @@ const goToDetail = (id: string) => {
                                     <div class="left">
                                         <UserLink :user="article.author" show-avatar />
                                         <n-tag
-                                            :color="{
-                                                textColor: getCategoryColor(article.category),
-                                                color: hexToRgba(
-                                                    getCategoryColor(article.category),
-                                                    0.2
-                                                ),
-                                                borderColor: getCategoryColor(article.category)
-                                            }"
+                                            class="article-color-tag"
+                                            :style="getCategoryTagStyle(article.category)"
                                             size="small"
                                         >
                                             <template #icon>
@@ -194,7 +186,9 @@ const goToDetail = (id: string) => {
         <div ref="loadTrigger" class="load-trigger">
             <div v-if="loading" class="loading-state">
                 <n-spin size="small" />
-                <span style="margin-left: 8px; color: var(--ui-muted-text-color)">正在加载更多推荐...</span>
+                <span style="margin-left: 8px; color: var(--ui-muted-text-color)"
+                    >正在加载更多推荐...</span
+                >
             </div>
 
             <div v-else-if="error" class="error-state">

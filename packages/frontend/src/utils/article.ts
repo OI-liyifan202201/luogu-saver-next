@@ -11,6 +11,16 @@ export const getCategoryColor = (id?: number) => {
     return ARTICLE_CATEGORIES[9]!.color;
 };
 
+export const getTagStyle = (color: string) => ({
+    '--n-color': `color-mix(in srgb, ${color} 20%, transparent)`,
+    '--n-text-color': color,
+    '--n-border': `1px solid ${color}`,
+    '--article-tag-color': color,
+    '--article-tag-background-color': `color-mix(in srgb, ${color} 20%, transparent)`
+});
+
+export const getCategoryTagStyle = (id?: number) => getTagStyle(getCategoryColor(id));
+
 export const getCategoryIcon = (id?: number) => {
     if (id && ARTICLE_CATEGORIES[id]) return ARTICLE_CATEGORIES[id].icon;
     return ARTICLE_CATEGORIES[9]!.icon;

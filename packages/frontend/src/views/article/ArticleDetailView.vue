@@ -32,11 +32,11 @@ import {
 import { useContentSaver } from '@/composables/useContentSaver';
 import { getArticleById, getRelevant, getArticleHistory, saveArticle } from '@/api/article';
 import type { Article, PlazaArticle, TocItem } from '@/types/article';
-import { hexToRgba } from '@/utils/render.ts';
 import {
     getCategoryLabel,
-    getCategoryColor,
     getCategoryIcon,
+    getCategoryTagStyle,
+    getTagStyle,
     generateTocAndProcessHtml
 } from '@/utils/article';
 
@@ -518,7 +518,10 @@ onMounted(() => {
                                             <n-skeleton text :repeat="2" />
                                             <n-skeleton text style="width: 60%" />
                                         </n-space>
-                                        <n-skeleton height="120px" style="border-radius: var(--ui-card-radius)" />
+                                        <n-skeleton
+                                            height="120px"
+                                            style="border-radius: var(--ui-card-radius)"
+                                        />
                                         <n-space vertical>
                                             <n-skeleton text :repeat="4" />
                                         </n-space>
@@ -564,22 +567,16 @@ onMounted(() => {
                                             <template #title-extra>
                                                 <n-tag
                                                     v-if="it.reason === 'title'"
-                                                    :color="{
-                                                        textColor: 'var(--ui-orange-color)',
-                                                        color: 'color-mix(in srgb, var(--ui-orange-color) 15%, transparent)',
-                                                        borderColor: 'var(--ui-orange-color)'
-                                                    }"
+                                                    class="article-color-tag"
+                                                    :style="getTagStyle('var(--ui-orange-color)')"
                                                     size="small"
                                                 >
                                                     标题相关
                                                 </n-tag>
                                                 <n-tag
                                                     v-else-if="it.reason === 'vector'"
-                                                    :color="{
-                                                        textColor: 'var(--ui-cyan-color)',
-                                                        color: 'color-mix(in srgb, var(--ui-cyan-color) 15%, transparent)',
-                                                        borderColor: 'var(--ui-cyan-color)'
-                                                    }"
+                                                    class="article-color-tag"
+                                                    :style="getTagStyle('var(--ui-cyan-color)')"
                                                     size="small"
                                                 >
                                                     相似文章
@@ -596,18 +593,8 @@ onMounted(() => {
                                                 <div class="left">
                                                     <UserLink :user="it.author" show-avatar />
                                                     <n-tag
-                                                        :color="{
-                                                            textColor: getCategoryColor(
-                                                                it.category
-                                                            ),
-                                                            color: hexToRgba(
-                                                                getCategoryColor(it.category),
-                                                                0.2
-                                                            ),
-                                                            borderColor: getCategoryColor(
-                                                                it.category
-                                                            )
-                                                        }"
+                                                        class="article-color-tag"
+                                                        :style="getCategoryTagStyle(it.category)"
                                                         size="small"
                                                     >
                                                         <template #icon>

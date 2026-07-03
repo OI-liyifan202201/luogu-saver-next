@@ -245,7 +245,7 @@ import {
 import { renderIcon } from '@/utils/render';
 
 import { uiThemeKey, type UiThemeVars } from '@/styles/theme/themeKeys.ts';
-import { defaultTheme } from '@/styles/theme/default-theme.ts';
+import { darkTheme, defaultTheme } from '@/styles/theme/default-theme.ts';
 import TrackingConsent from '@/components/TrackingConsent.vue';
 import LuoguLogo from '@/components/icons/LuoguLogo.vue';
 import { currentRole, isAuthenticated, setCurrentAuth } from '@/utils/auth.ts';
@@ -460,7 +460,16 @@ const menuOptions = computed<MenuOption[]>(() => [
 
 import { THEME_STORAGE_KEY } from '@/utils/constants.ts';
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
-const themeStorage = useLocalStorage(THEME_STORAGE_KEY, defaultTheme);
+
+const getInitialTheme = (): UiThemeVars => {
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+        return darkTheme;
+    }
+
+    return defaultTheme;
+};
+
+const themeStorage = useLocalStorage(THEME_STORAGE_KEY, getInitialTheme());
 type StoredUiThemeVars = Partial<UiThemeVars> & { codeRenderFilter?: string };
 
 const normalizeThemeVars = (storedTheme: StoredUiThemeVars | null): UiThemeVars => {
@@ -851,16 +860,16 @@ const themeCssVars = computed(() => {
         '--ui-card-radius': vars.cardRadius,
         '--ui-pill-radius': vars.pillRadius,
         '--ui-icon-color': vars.iconColor,
-        '--ui-user-red-color': vars.userRedColor,
-        '--ui-user-orange-color': vars.userOrangeColor,
-        '--ui-user-purple-color': vars.userPurpleColor,
-        '--ui-user-green-color': vars.userGreenColor,
-        '--ui-user-blue-color': vars.userBlueColor,
-        '--ui-user-gray-color': vars.userGrayColor,
-        '--ui-user-cheater-color': vars.userCheaterColor,
-        '--ui-prize-green-color': vars.prizeGreenColor,
-        '--ui-prize-blue-color': vars.prizeBlueColor,
-        '--ui-prize-gold-color': vars.prizeGoldColor,
+        '--ui-user-red-color': defaultTheme.userRedColor,
+        '--ui-user-orange-color': defaultTheme.userOrangeColor,
+        '--ui-user-purple-color': defaultTheme.userPurpleColor,
+        '--ui-user-green-color': defaultTheme.userGreenColor,
+        '--ui-user-blue-color': defaultTheme.userBlueColor,
+        '--ui-user-gray-color': defaultTheme.userGrayColor,
+        '--ui-user-cheater-color': defaultTheme.userCheaterColor,
+        '--ui-prize-green-color': defaultTheme.prizeGreenColor,
+        '--ui-prize-blue-color': defaultTheme.prizeBlueColor,
+        '--ui-prize-gold-color': defaultTheme.prizeGoldColor,
         '--ui-category-personal-color': vars.categoryPersonalColor,
         '--ui-category-solution-color': vars.categorySolutionColor,
         '--ui-category-tech-color': vars.categoryTechColor,

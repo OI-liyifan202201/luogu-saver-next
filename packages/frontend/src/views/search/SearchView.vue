@@ -21,6 +21,7 @@ import Card from '@/components/Card.vue';
 import { searchArticles, type ArticleSearchHit } from '@/api/search.ts';
 import { ARTICLE_CATEGORIES, UNKNOWN_CATEGORY } from '@/utils/constants.ts';
 import { formatDate, renderSafeMarkedHtml } from '@/utils/render.ts';
+import { getCategoryTagStyle } from '@/utils/article.ts';
 
 const route = useRoute();
 const router = useRouter();
@@ -212,7 +213,11 @@ onMounted(loadSearch);
                     </div>
                     <n-space align="center" justify="space-between" class="result-footer">
                         <n-space size="small" align="center">
-                            <n-tag size="small" :bordered="false">
+                            <n-tag
+                                class="article-color-tag"
+                                size="small"
+                                :style="getCategoryTagStyle(item.category)"
+                            >
                                 <template #icon>
                                     <n-icon :component="getCategory(item.category).icon" />
                                 </template>

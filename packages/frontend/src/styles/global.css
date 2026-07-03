@@ -74,6 +74,23 @@
     color: inherit !important;
 }
 
+.n-tag.article-color-tag,
+.n-tag.article-color-tag.n-tag--icon {
+    background-color: var(--article-tag-background-color) !important;
+    color: var(--article-tag-color) !important;
+    border-color: var(--article-tag-color) !important;
+}
+
+.n-tag.article-color-tag .n-tag__content,
+.n-tag.article-color-tag .n-tag__icon,
+.n-tag.article-color-tag .n-icon {
+    color: var(--article-tag-color) !important;
+}
+
+.n-tag.article-color-tag .n-tag__border {
+    border-color: var(--article-tag-color) !important;
+}
+
 .n-space {
     color: inherit;
 }
