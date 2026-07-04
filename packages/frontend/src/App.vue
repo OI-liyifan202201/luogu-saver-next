@@ -53,6 +53,16 @@
                         <n-layout class="app-main" :native-scrollbar="false">
                             <n-layout-content content-style="padding: 28px;">
                                 <div class="router-view">
+                                    <n-button
+                                        v-if="!mobileSiderOpen"
+                                        class="mobile-sider-button"
+                                        aria-label="打开侧边栏"
+                                        @click.stop="openMobileSider"
+                                    >
+                                        <template #icon>
+                                            <n-icon :component="MenuOutline" />
+                                        </template>
+                                    </n-button>
                                     <n-back-top :right="50" :bottom="200" />
                                     <router-view />
                                 </div>
@@ -214,6 +224,7 @@ import {
     NMessageProvider,
     NBackTop,
     NDialogProvider,
+    NButton,
     NIcon
 } from 'naive-ui';
 
@@ -226,7 +237,8 @@ import {
     SettingsOutline,
     ShieldCheckmarkOutline,
     ChatbubbleEllipsesOutline,
-    CloudDownloadOutline
+    CloudDownloadOutline,
+    MenuOutline
 } from '@vicons/ionicons5';
 
 import { Icon, IconConfigProvider } from '@vicons/utils';
@@ -1060,6 +1072,10 @@ setInterval(() => {
     background-color: var(--ui-back-top-hover-color) !important;
 }
 
+.mobile-sider-button {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .app-shell {
         position: relative;
@@ -1115,6 +1131,35 @@ setInterval(() => {
     .app-footer {
         padding: 12px 16px;
         margin: 10px -10px -10px -10px;
+    }
+
+    .mobile-sider-button {
+        position: fixed;
+        right: 20px;
+        bottom: 76px;
+        z-index: 1000;
+        display: flex;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        padding: 0;
+        color: var(--ui-back-top-icon-color) !important;
+        background: var(--ui-back-top-color) !important;
+        border: 0 !important;
+        border-radius: var(--ui-card-radius) !important;
+        box-shadow: var(--ui-elevated-shadow) !important;
+    }
+
+    .mobile-sider-button:hover,
+    .mobile-sider-button:focus {
+        color: var(--ui-back-top-icon-hover-color) !important;
+        background: var(--ui-back-top-hover-color) !important;
+        box-shadow: var(--ui-elevated-shadow) !important;
+    }
+
+    .mobile-sider-button :deep(.n-button__border),
+    .mobile-sider-button :deep(.n-button__state-border) {
+        border: 0 !important;
     }
 
     .footer-element,
