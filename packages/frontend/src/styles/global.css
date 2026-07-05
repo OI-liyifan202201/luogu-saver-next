@@ -24,6 +24,7 @@
 }
 
 :not(pre) > code {
+    font-family: 'Fira Code', Consolas, 'Liberation Mono', 'Courier New', monospace !important;
     background: var(--ui-inline-code-background-color) !important;
     padding: 2px 6px !important;
     border-radius: var(--ui-card-radius) !important;
@@ -231,6 +232,7 @@
 
 .shiki,
 .shiki span {
+    font-family: 'Fira Code', Consolas, 'Liberation Mono', 'Courier New', monospace !important;
     color: var(--shiki-light);
     font-style: var(--shiki-light-font-style);
     font-weight: var(--shiki-light-font-weight);

@@ -737,7 +737,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
             boxShadow: uiThemeVars.value.elevatedShadow,
             boxShadowHover: uiThemeVars.value.elevatedShadow,
             boxShadowPressed: uiThemeVars.value.elevatedShadow,
-            borderRadius: uiThemeVars.value.cardRadius
+            borderRadius: uiThemeVars.value.pillRadius
         },
         Alert: {
             color: uiThemeVars.value.panelColor,
@@ -1072,6 +1072,10 @@ setInterval(() => {
     background-color: var(--ui-back-top-hover-color) !important;
 }
 
+:deep(.n-back-top) {
+    border-radius: var(--ui-pill-radius) !important;
+}
+
 .mobile-sider-button {
     display: none;
 }
@@ -1146,7 +1150,7 @@ setInterval(() => {
         color: var(--ui-back-top-icon-color) !important;
         background: var(--ui-back-top-color) !important;
         border: 0 !important;
-        border-radius: var(--ui-card-radius) !important;
+        border-radius: var(--ui-pill-radius) !important;
         box-shadow: var(--ui-elevated-shadow) !important;
     }
 
