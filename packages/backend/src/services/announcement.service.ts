@@ -7,19 +7,28 @@ export type AnnouncementInput = {
     enabled?: unknown;
 };
 
+export type AnnouncementResponse = {
+    id: number;
+    title: string;
+    content: string;
+    enabled: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
+};
+
 const ANNOUNCEMENT_ID = 1;
 const DEFAULT_TITLE = '公告';
 
 export class AnnouncementService {
-    static async getPublicAnnouncement(): Promise<Announcement | null> {
+    static async getPublicAnnouncement(): Promise<AnnouncementResponse | null> {
         const announcement = await this.getStoredAnnouncement();
-        if (!announcement?.enabled) return null;
-        return announcement;
+        if (!announcement || !this.normalizeEnabled(announcement.enabled)) return null;
+        return this.toResponse(announcement, false);
     }
 
-    static async getAdminAnnouncement(): Promise<Partial<Announcement>> {
+    static async getAdminAnnouncement(): Promise<AnnouncementResponse> {
         const announcement = await this.getStoredAnnouncement();
-        if (announcement) return announcement;
+        if (announcement) return this.toResponse(announcement, true);
 
         return {
             id: ANNOUNCEMENT_ID,
@@ -29,20 +38,16 @@ export class AnnouncementService {
         };
     }
 
-    static async updateAnnouncement(input: AnnouncementInput): Promise<Announcement> {
+    static async updateAnnouncement(input: AnnouncementInput): Promise<AnnouncementResponse> {
         const existing = await this.getStoredAnnouncement();
-        const announcement =
-            existing ||
-            Announcement.create({
-                id: ANNOUNCEMENT_ID
-            });
+        const announcement = existing || Announcement.create({ id: ANNOUNCEMENT_ID });
 
         announcement.title = this.normalizeTitle(input.title);
         announcement.content = String(input.content ?? '');
-        announcement.enabled = Boolean(input.enabled);
+        announcement.enabled = this.normalizeEnabled(input.enabled);
 
         await saveServiceEntity<Announcement>(Announcement, announcement);
-        return announcement;
+        return this.toResponse(announcement, true);
     }
 
     private static async getStoredAnnouncement(): Promise<Announcement | null> {
@@ -54,5 +59,29 @@ export class AnnouncementService {
     private static normalizeTitle(value: unknown): string {
         const title = String(value ?? '').trim();
         return title || DEFAULT_TITLE;
+    }
+
+    private static normalizeEnabled(value: unknown): boolean {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return value !== 0;
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            return normalized === 'true' || normalized === '1';
+        }
+        return false;
+    }
+
+    private static toResponse(
+        announcement: Announcement,
+        includeCreatedAt: boolean
+    ): AnnouncementResponse {
+        return {
+            id: announcement.id,
+            title: announcement.title,
+            content: announcement.content,
+            enabled: this.normalizeEnabled(announcement.enabled),
+            ...(includeCreatedAt ? { createdAt: announcement.createdAt } : {}),
+            updatedAt: announcement.updatedAt
+        };
     }
 }

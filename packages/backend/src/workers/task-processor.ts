@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { WorkflowHelper } from '@/services/helpers/workflow.helper';
 import { type TaskHandler } from '@/workers/types';
 import { Job, UnrecoverableError } from 'bullmq';
+import { normalizeErrorReason } from '@/utils/error-reason';
 
 export class TaskProcessor<T extends CommonTask> {
     private taskHandlers = new Map<string, TaskHandler<T>>();
@@ -57,7 +58,14 @@ export class TaskProcessor<T extends CommonTask> {
         );
 
         await job.updateProgress('Sending to handler');
-        const result = await handler.handle(task, job);
+        let result: any;
+        try {
+            result = await handler.handle(task, job);
+        } catch (error) {
+            const reason = normalizeErrorReason(error);
+            if (error instanceof UnrecoverableError) throw new UnrecoverableError(reason);
+            throw new Error(reason);
+        }
 
         logger.debug(
             {

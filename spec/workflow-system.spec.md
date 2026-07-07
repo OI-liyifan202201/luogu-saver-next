@@ -361,16 +361,17 @@ Read task handlers SHALL be the only task handlers that load article or paste co
 2. Only report tasks emit websocket events `task:{taskId}:completed` and `task:{taskId}:failed`.
 3. A report task completed event payload SHALL contain `status='completed'` and `result=returnvalue.__result`.
 4. A report task failed event payload SHALL contain `status='failed'` and `error`.
-5. Non-report workflow tasks do not emit `task:{taskId}` websocket events.
-6. Legacy non-workflow tasks emit websocket task events for every completed or failed task.
-7. When a workflow task completes successfully, its `task.result` stores the full processor return value.
-8. When a workflow task completes successfully, its direct descendant counters are released exactly once.
-9. A descendant task is added to BullMQ when every father task has `status = COMPLETED` and the descendant task status is neither `COMPLETED` nor `FAILED`.
-10. Workflow completion status is set to `completed` when every task row with `workflow_id = workflowId` has `status = COMPLETED`.
-11. Workflow failure status is set to `failed` when any workflow task reaches final failure.
-12. After workflow status becomes `failed`, no new descendant tasks for that workflow SHALL be added by workflow scheduling code.
-13. For tracked tasks (`track = true`), when a job includes `workflowId` and `taskName`, its return payload is merged into `workflow.result[taskName]`.
-14. Result payload is normalized as:
+5. A report task failed event `error` SHALL be normalized by `task-queue.spec.md` failure reason normalization and have length at most 80 characters.
+6. Non-report workflow tasks do not emit `task:{taskId}` websocket events.
+7. Legacy non-workflow tasks emit websocket task events for every completed or failed task.
+8. When a workflow task completes successfully, its `task.result` stores the full processor return value.
+9. When a workflow task completes successfully, its direct descendant counters are released exactly once.
+10. A descendant task is added to BullMQ when every father task has `status = COMPLETED` and the descendant task status is neither `COMPLETED` nor `FAILED`.
+11. Workflow completion status is set to `completed` when every task row with `workflow_id = workflowId` has `status = COMPLETED`.
+12. Workflow failure status is set to `failed` when any workflow task reaches final failure.
+13. After workflow status becomes `failed`, no new descendant tasks for that workflow SHALL be added by workflow scheduling code.
+14. For tracked tasks (`track = true`), when a job includes `workflowId` and `taskName`, its return payload is merged into `workflow.result[taskName]`.
+15. Result payload is normalized as:
 
 ```json
 {
@@ -379,9 +380,9 @@ Read task handlers SHALL be the only task handlers that load article or paste co
 }
 ```
 
-15. Status writes are monotonic with respect to terminal states.
-16. If current `workflow.status` is `completed`, `failed`, or `expired`, later queue status reads, worker events, recovery passes, or queue events MUST NOT replace it.
-17. If current `workflow.status` is not terminal, worker events or recovery passes MAY replace it with `active`, `completed`, or `failed`.
+16. Status writes are monotonic with respect to terminal states.
+17. If current `workflow.status` is `completed`, `failed`, or `expired`, later queue status reads, worker events, recovery passes, or queue events MUST NOT replace it.
+18. If current `workflow.status` is not terminal, worker events or recovery passes MAY replace it with `active`, `completed`, or `failed`.
 
 ## 7. Runtime Redis Keys
 

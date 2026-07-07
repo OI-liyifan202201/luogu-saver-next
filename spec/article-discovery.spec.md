@@ -25,7 +25,7 @@ Table name: `discovery_run`
 | `pending_pages`       | INT      | NOT NULL    | Number of page chains that have not terminated                                                                   |
 | `discovered_articles` | INT      | NOT NULL    | Number of distinct article rows inserted                                                                         |
 | `created_workflows`   | INT      | NOT NULL    | Number of save workflows created by this run                                                                     |
-| `last_error`          | TEXT     | NULLABLE    | Last final page failure message, truncated                                                                       |
+| `last_error`          | TEXT     | NULLABLE    | Last final page failure message, at most 80 characters                                                           |
 | `finished_at`         | DATETIME | NULLABLE    | Completion or stop timestamp                                                                                     |
 | `created_at`          | DATETIME | NOT NULL    | Record creation timestamp                                                                                        |
 | `updated_at`          | DATETIME | NOT NULL    | Record update timestamp                                                                                          |
@@ -34,18 +34,18 @@ Table name: `discovery_run`
 
 Table name: `discovered_article`
 
-| Column         | Type        | Constraints | Description                            |
-| -------------- | ----------- | ----------- | -------------------------------------- |
-| `id`           | UUID        | PRIMARY KEY | Row identifier                         |
-| `run_id`       | VARCHAR     | NOT NULL    | Discovery run identifier               |
-| `article_id`   | VARCHAR(8)  | NOT NULL    | Luogu article LID                      |
-| `source`       | VARCHAR     | NOT NULL    | `plaza` or `user_articles`             |
-| `status`       | VARCHAR     | NOT NULL    | `discovered`, `workflow_created`, etc. |
-| `workflow_id`  | VARCHAR(36) | NULLABLE    | Created article save workflow ID       |
-| `reason`       | TEXT        | NULLABLE    | Failure or skip reason                 |
-| `last_seen_at` | DATETIME    | NOT NULL    | Last time this run saw the article     |
-| `created_at`   | DATETIME    | NOT NULL    | Record creation timestamp              |
-| `updated_at`   | DATETIME    | NOT NULL    | Record update timestamp                |
+| Column         | Type        | Constraints | Description                                   |
+| -------------- | ----------- | ----------- | --------------------------------------------- |
+| `id`           | UUID        | PRIMARY KEY | Row identifier                                |
+| `run_id`       | VARCHAR     | NOT NULL    | Discovery run identifier                      |
+| `article_id`   | VARCHAR(8)  | NOT NULL    | Luogu article LID                             |
+| `source`       | VARCHAR     | NOT NULL    | `plaza` or `user_articles`                    |
+| `status`       | VARCHAR     | NOT NULL    | `discovered`, `workflow_created`, etc.        |
+| `workflow_id`  | VARCHAR(36) | NULLABLE    | Created article save workflow ID              |
+| `reason`       | TEXT        | NULLABLE    | Failure or skip reason, at most 80 characters |
+| `last_seen_at` | DATETIME    | NOT NULL    | Last time this run saw the article            |
+| `created_at`   | DATETIME    | NOT NULL    | Record creation timestamp                     |
+| `updated_at`   | DATETIME    | NOT NULL    | Record update timestamp                       |
 
 `(run_id, article_id)` SHALL be unique.
 
@@ -83,7 +83,8 @@ A `discover:article_plaza` task SHALL:
 If fetching or parsing fails:
 
 1. Non-final BullMQ attempts SHALL rethrow the error without incrementing `failed_pages` and without decrementing `pending_pages`.
-2. The final attempt SHALL increment `failed_pages`, write `last_error`, decrement `pending_pages`, and rethrow the error.
+2. The final attempt SHALL increment `failed_pages`, write normalized `last_error`, decrement `pending_pages`, and rethrow the error.
+3. Normalized `last_error` SHALL follow `task-queue.spec.md` failure reason normalization and have length at most 80 characters.
 
 ## 4.1 User Article Run Creation
 
@@ -138,7 +139,8 @@ If fetching or parsing fails, error handling SHALL match Section 4.
 4. If `(run_id, article_id)` already exists, update `last_seen_at` and return duplicate.
 5. Create one `article-save-pipeline` workflow with `targetId = articleId`, `forceUpdate`, and BullMQ job priority `10`.
 6. On workflow creation success, set row status to `workflow_created` and store `workflow_id`.
-7. On workflow creation failure, set row status to `failed` and store the error message.
+7. On workflow creation failure, set row status to `failed` and store the normalized error message.
+8. Normalized workflow creation failure `reason` SHALL follow `task-queue.spec.md` failure reason normalization and have length at most 80 characters.
 
 Discovery SHALL NOT create article-link edges.
 Discovery SHALL NOT recursively create discovery work from saved article content.

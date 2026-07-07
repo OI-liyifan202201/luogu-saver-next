@@ -44,7 +44,13 @@ The middleware order SHALL satisfy these constraints:
 4. API rate limiting SHALL execute before request body parsing.
 5. Route handlers SHALL execute after response helper, authorization, API rate limiting, and request body parsing.
 
-## 5. File Locations
+## 5. Response Helper
+
+`ctx.fail(code, message, data?)` SHALL return HTTP 200 with body `{ code, message, data }`.
+
+The returned `message` SHALL be normalized by `task-queue.spec.md` failure reason normalization and have length at most 80 characters.
+
+## 6. File Locations
 
 - Entry point: `packages/backend/src/index.ts`
 - Client IP helper: `packages/backend/src/middlewares/client-ip.ts`

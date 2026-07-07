@@ -175,6 +175,7 @@ Query task status.
 
 1. Update the task record with new `status`.
 2. If `info` is provided, update the `info` field.
+3. If `status = FAILED`, the persisted `info` SHALL be a normalized failure reason with length at most 80 characters.
 
 ### 5.4 getTaskById(taskId)
 
@@ -185,6 +186,19 @@ Query task status.
 
 1. If a TaskService read/write method receives an optional `manager` argument, it SHALL use that `EntityManager` for database access.
 2. If no `manager` is provided, the method SHALL use the default task repository.
+
+### 5.6 Failure reason normalization
+
+Failure reason normalization SHALL:
+
+1. Convert an `Error` input to `error.message` and any other input to `String(input)`.
+2. Replace each non-empty whitespace sequence with one ASCII space.
+3. Trim leading and trailing whitespace.
+4. Use `Unknown error` if the result is empty.
+5. Return the result unchanged if its length is at most 80 characters.
+6. Return the first 77 characters followed by `...` if its length is greater than 80 characters.
+
+Every task failed websocket payload field `error` SHALL use the normalized failure reason.
 
 ## 6. Queue System
 
@@ -280,6 +294,8 @@ interface TaskHandler<T extends CommonTask> {
 6. If `job.data.workflowId` is present, override `job.getChildrenValues()` so it returns direct father task results keyed by father task name.
 7. Execute `handler.handle(task)`.
 8. Return `{ __result, __name }`, where `__result` is the handler result and `__name` is the BullMQ job name.
+9. If `handler.handle(task)` throws, rethrow an error whose message is the normalized failure reason.
+10. If the thrown error is `UnrecoverableError`, the rethrown error SHALL also be `UnrecoverableError`.
 
 ### 7.3 Registered Handlers
 

@@ -161,8 +161,7 @@ export async function bootstrap() {
             searchWorkerHost.close(),
             readWorkerHost.close(),
             ragWorkerHost.close(),
-            discoverWorkerHost.close(),
-            FlowManager.closeQueueEvents()
+            discoverWorkerHost.close()
         ]);
     };
 
@@ -176,7 +175,6 @@ export async function bootstrap() {
         process.exit(0);
     });
 
-    FlowManager.setupQueueEvents();
     FlowManager.startRecoveryInBackground();
     WorkflowCleanupService.start();
     logger.info('Worker hosts initialized and running.');

@@ -21,15 +21,19 @@ import { getCurrentUser } from '@/api/auth.ts';
 import {
     getAdminUsers,
     getAdminAnnouncement,
+    getAdminNotifications,
     rebuildArticleEmbeddings,
     reindexSearch,
     startArticlePlazaDiscovery,
     stopDiscoveryRun,
     updateAdminAnnouncement,
+    updateAdminNotifications,
     updateAdminUserRole,
+    type AdminSiteNotification,
     type AdminUser,
     type DiscoveryRun
 } from '@/api/admin.ts';
+import type { NotificationChannel } from '@/api/notification.ts';
 import { currentAuth, isAuthenticated, setCurrentAuth, startCpOAuthLogin } from '@/utils/auth.ts';
 import { hasAnyPermission, hasPermission, Permission } from '@/utils/permissions.ts';
 import { useContentSaver } from '@/composables/useContentSaver.ts';
@@ -52,6 +56,8 @@ const startingDiscovery = ref(false);
 const loadingDiscoveryRuns = ref(false);
 const loadingAnnouncement = ref(false);
 const savingAnnouncement = ref(false);
+const loadingNotifications = ref(false);
+const savingNotifications = ref(false);
 const batchSize = ref(100);
 const embeddingBatchSize = ref(20);
 const embeddingConcurrency = ref(5);
@@ -64,8 +70,11 @@ const announcementForm = ref({
     content: '',
     enabled: true
 });
+type NotificationDraft = AdminSiteNotification & { localId: string };
+const notificationDrafts = ref<NotificationDraft[]>([]);
 const { setupTaskUpdateListener } = useContentSaver();
 let discoverySocketAttached = false;
+let nextNotificationDraftId = 0;
 
 const canManageUsers = computed(() =>
     hasPermission(currentAuth.value?.role, Permission.MANAGE_USERS)
@@ -87,6 +96,8 @@ const canManageAnnouncements = computed(() =>
 const canManageDiscovery = computed(() =>
     hasPermission(currentAuth.value?.role, Permission.MANAGE_DISCOVERY)
 );
+const bannerNotificationDrafts = computed(() => getNotificationDraftsByChannel('banner'));
+const popupNotificationDrafts = computed(() => getNotificationDraftsByChannel('popup'));
 
 async function loadCurrentAuth() {
     if (!isAuthenticated.value || currentAuth.value) return;
@@ -123,6 +134,98 @@ async function loadAnnouncement() {
     } finally {
         loadingAnnouncement.value = false;
     }
+}
+
+async function loadNotifications() {
+    if (!canManageAnnouncements.value) return;
+    loadingNotifications.value = true;
+    try {
+        const response = await getAdminNotifications();
+        if (response.code === 200) {
+            notificationDrafts.value = response.data.notifications.map(toNotificationDraft);
+        } else {
+            message.error(response.message);
+        }
+    } finally {
+        loadingNotifications.value = false;
+    }
+}
+
+function getNotificationDraftsByChannel(channel: NotificationChannel) {
+    return notificationDrafts.value
+        .filter(item => item.channel === channel)
+        .sort((a, b) => a.sortOrder - b.sortOrder || getDraftStableId(a) - getDraftStableId(b));
+}
+
+function getDraftStableId(item: NotificationDraft) {
+    return item.id ?? Number(item.localId.replace('draft-', ''));
+}
+
+function toNotificationDraft(item: AdminSiteNotification): NotificationDraft {
+    return {
+        ...item,
+        content: item.content ?? '',
+        localId: `draft-${++nextNotificationDraftId}`
+    };
+}
+
+function createNotificationDraft(channel: NotificationChannel): NotificationDraft {
+    const channelItems = getNotificationDraftsByChannel(channel);
+    return {
+        localId: `draft-${++nextNotificationDraftId}`,
+        channel,
+        title: channel === 'banner' ? 'Banner 通知' : 'Popup 通知',
+        content: '',
+        enabled: true,
+        loginOnly: false,
+        sortOrder: channelItems.length * 10
+    };
+}
+
+function addNotification(channel: NotificationChannel) {
+    notificationDrafts.value.push(createNotificationDraft(channel));
+    renumberNotificationOrder(channel);
+}
+
+function removeNotification(localId: string) {
+    const item = notificationDrafts.value.find(draft => draft.localId === localId);
+    notificationDrafts.value = notificationDrafts.value.filter(draft => draft.localId !== localId);
+    if (item) renumberNotificationOrder(item.channel);
+}
+
+function moveNotification(localId: string, direction: -1 | 1) {
+    const item = notificationDrafts.value.find(draft => draft.localId === localId);
+    if (!item) return;
+
+    const channelItems = getNotificationDraftsByChannel(item.channel);
+    const index = channelItems.findIndex(draft => draft.localId === localId);
+    const swap = channelItems[index + direction];
+    if (!swap) return;
+
+    const sortOrder = item.sortOrder;
+    item.sortOrder = swap.sortOrder;
+    swap.sortOrder = sortOrder;
+    renumberNotificationOrder(item.channel);
+}
+
+function renumberNotificationOrder(channel: NotificationChannel) {
+    getNotificationDraftsByChannel(channel).forEach((item, index) => {
+        item.sortOrder = index * 10;
+    });
+}
+
+function buildNotificationPayload() {
+    renumberNotificationOrder('banner');
+    renumberNotificationOrder('popup');
+    return notificationDrafts.value.map(item => ({
+        id: item.id,
+        channel: item.channel,
+        title: item.title,
+        content: item.content,
+        enabled: item.enabled,
+        loginOnly: item.loginOnly,
+        sortOrder: item.sortOrder
+    }));
 }
 
 function handleDiscoveryRunsUpdate(payload: { runs?: DiscoveryRun[] }) {
@@ -186,6 +289,22 @@ async function handleAnnouncementSave() {
     }
 }
 
+async function handleNotificationsSave() {
+    if (!canManageAnnouncements.value) return;
+    savingNotifications.value = true;
+    try {
+        const response = await updateAdminNotifications(buildNotificationPayload());
+        if (response.code === 200) {
+            notificationDrafts.value = response.data.notifications.map(toNotificationDraft);
+            message.success('通知配置已保存');
+        } else {
+            message.error(response.message);
+        }
+    } finally {
+        savingNotifications.value = false;
+    }
+}
+
 async function saveRole(row: AdminUser) {
     if (row.role === null) return;
     const response = await updateAdminUserRole(row.id, row.role);
@@ -203,6 +322,11 @@ async function handleReindex() {
     }
 
     const taskId = response.data.reportTaskIds['reindex-search'];
+    if (!taskId) {
+        reindexing.value = false;
+        message.error('搜索索引重建任务 ID 缺失');
+        return;
+    }
     setupTaskUpdateListener(
         taskId,
         () => {
@@ -230,6 +354,11 @@ async function handleEmbeddingRebuild() {
     }
 
     const taskId = response.data.reportTaskIds['rebuild-embedding'];
+    if (!taskId) {
+        rebuildingEmbeddings.value = false;
+        message.error('Embedding 重建任务 ID 缺失');
+        return;
+    }
     setupTaskUpdateListener(
         taskId,
         data => {
@@ -348,7 +477,7 @@ const discoveryColumns = [
 onMounted(async () => {
     await loadCurrentAuth();
     attachDiscoverySocket();
-    await Promise.all([loadUsers(), loadAnnouncement()]);
+    await Promise.all([loadUsers(), loadAnnouncement(), loadNotifications()]);
     if (route.query.section === 'announcement') {
         await nextTick();
         announcementSectionRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -367,10 +496,10 @@ onBeforeUnmount(() => {
         </CardTitle>
 
         <n-alert v-if="!isAuthenticated" type="warning" title="需要登录" class="state-alert">
-            请先登录后访问后台。
-            <template #action>
+            <div class="state-alert-content">
+                <span>请先登录后访问后台。</span>
                 <n-button size="small" @click="startCpOAuthLogin('/admin')">登录</n-button>
-            </template>
+            </div>
         </n-alert>
 
         <n-alert v-else-if="!canOpenAdmin" type="error" title="无权限" class="state-alert">
@@ -594,6 +723,193 @@ onBeforeUnmount(() => {
                 </n-spin>
             </Card>
 
+            <Card title="通知管理" class="announcement-card">
+                <n-spin :show="loadingNotifications">
+                    <n-space v-if="canManageAnnouncements" vertical size="large">
+                        <section class="notification-editor-section">
+                            <div class="notification-editor-heading">
+                                <div>
+                                    <strong>顶部 Banner</strong>
+                                    <p class="muted">显示在页面内容顶部，可被用户关闭。</p>
+                                </div>
+                                <n-button secondary @click="addNotification('banner')">
+                                    新增 Banner
+                                </n-button>
+                            </div>
+
+                            <n-alert
+                                v-if="bannerNotificationDrafts.length === 0"
+                                type="info"
+                                title="暂无 Banner"
+                            >
+                                当前没有顶部 Banner 通知。
+                            </n-alert>
+
+                            <div
+                                v-for="(item, index) in bannerNotificationDrafts"
+                                :key="item.localId"
+                                class="notification-item-editor"
+                            >
+                                <div class="notification-item-toolbar">
+                                    <n-space align="center">
+                                        <n-tag type="info">Banner #{{ index + 1 }}</n-tag>
+                                        <n-form-item
+                                            label="启用"
+                                            label-placement="left"
+                                            :show-feedback="false"
+                                            class="announcement-enabled-field"
+                                        >
+                                            <n-switch v-model:value="item.enabled" />
+                                        </n-form-item>
+                                        <n-form-item
+                                            label="仅登录可见"
+                                            label-placement="left"
+                                            :show-feedback="false"
+                                            class="announcement-enabled-field"
+                                        >
+                                            <n-switch v-model:value="item.loginOnly" />
+                                        </n-form-item>
+                                    </n-space>
+                                    <n-space>
+                                        <n-button
+                                            size="small"
+                                            :disabled="index === 0"
+                                            @click="moveNotification(item.localId, -1)"
+                                        >
+                                            上移
+                                        </n-button>
+                                        <n-button
+                                            size="small"
+                                            :disabled="
+                                                index === bannerNotificationDrafts.length - 1
+                                            "
+                                            @click="moveNotification(item.localId, 1)"
+                                        >
+                                            下移
+                                        </n-button>
+                                        <n-button
+                                            size="small"
+                                            type="error"
+                                            secondary
+                                            @click="removeNotification(item.localId)"
+                                        >
+                                            删除
+                                        </n-button>
+                                    </n-space>
+                                </div>
+
+                                <n-form-item label="标题" :show-feedback="false">
+                                    <n-input v-model:value="item.title" />
+                                </n-form-item>
+
+                                <HtmlCodeEditor v-model:value="item.content" />
+
+                                <div class="announcement-preview-shell">
+                                    <div class="muted">Banner 预览</div>
+                                    <div class="announcement-preview" v-html="item.content"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="notification-editor-section">
+                            <div class="notification-editor-heading">
+                                <div>
+                                    <strong>Popup 弹窗</strong>
+                                    <p class="muted">页面加载后弹出，可选择仅对登录用户显示。</p>
+                                </div>
+                                <n-button secondary @click="addNotification('popup')">
+                                    新增 Popup
+                                </n-button>
+                            </div>
+
+                            <n-alert
+                                v-if="popupNotificationDrafts.length === 0"
+                                type="info"
+                                title="暂无 Popup"
+                            >
+                                当前没有弹窗通知。
+                            </n-alert>
+
+                            <div
+                                v-for="(item, index) in popupNotificationDrafts"
+                                :key="item.localId"
+                                class="notification-item-editor"
+                            >
+                                <div class="notification-item-toolbar">
+                                    <n-space align="center">
+                                        <n-tag type="warning">Popup #{{ index + 1 }}</n-tag>
+                                        <n-form-item
+                                            label="启用"
+                                            label-placement="left"
+                                            :show-feedback="false"
+                                            class="announcement-enabled-field"
+                                        >
+                                            <n-switch v-model:value="item.enabled" />
+                                        </n-form-item>
+                                        <n-form-item
+                                            label="仅登录可见"
+                                            label-placement="left"
+                                            :show-feedback="false"
+                                            class="announcement-enabled-field"
+                                        >
+                                            <n-switch v-model:value="item.loginOnly" />
+                                        </n-form-item>
+                                    </n-space>
+                                    <n-space>
+                                        <n-button
+                                            size="small"
+                                            :disabled="index === 0"
+                                            @click="moveNotification(item.localId, -1)"
+                                        >
+                                            上移
+                                        </n-button>
+                                        <n-button
+                                            size="small"
+                                            :disabled="index === popupNotificationDrafts.length - 1"
+                                            @click="moveNotification(item.localId, 1)"
+                                        >
+                                            下移
+                                        </n-button>
+                                        <n-button
+                                            size="small"
+                                            type="error"
+                                            secondary
+                                            @click="removeNotification(item.localId)"
+                                        >
+                                            删除
+                                        </n-button>
+                                    </n-space>
+                                </div>
+
+                                <n-form-item label="标题" :show-feedback="false">
+                                    <n-input v-model:value="item.title" />
+                                </n-form-item>
+
+                                <HtmlCodeEditor v-model:value="item.content" />
+
+                                <div class="announcement-preview-shell">
+                                    <div class="muted">Popup 预览</div>
+                                    <div class="announcement-preview" v-html="item.content"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <n-space justify="end">
+                            <n-button
+                                type="primary"
+                                :loading="savingNotifications"
+                                @click="handleNotificationsSave"
+                            >
+                                保存通知配置
+                            </n-button>
+                        </n-space>
+                    </n-space>
+                    <n-alert v-else type="warning" title="缺少 MANAGE_ANNOUNCEMENTS">
+                        你没有公告管理权限。
+                    </n-alert>
+                </n-spin>
+            </Card>
+
             <Card title="注册用户" class="users-card">
                 <n-spin :show="loading">
                     <n-data-table
@@ -640,6 +956,13 @@ onBeforeUnmount(() => {
     margin-bottom: 0;
 }
 
+.state-alert-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 .announcement-toolbar {
     align-items: flex-start;
 }
@@ -653,7 +976,52 @@ onBeforeUnmount(() => {
     margin-bottom: 0;
 }
 
+.notification-editor-section {
+    padding: 14px;
+    border: 1px solid var(--ui-border-color);
+    border-radius: var(--ui-card-radius);
+    background: var(--ui-panel-color);
+}
+
+.notification-editor-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.notification-editor-heading strong {
+    color: var(--ui-card-title-color);
+    font-size: 15px;
+}
+
+.notification-editor-heading p {
+    margin: 4px 0 0;
+    font-size: 12px;
+}
+
+.notification-item-editor {
+    padding: 14px;
+    border: 1px solid var(--ui-border-color);
+    border-radius: var(--ui-card-radius);
+    background: var(--ui-card-color);
+}
+
+.notification-item-editor + .notification-item-editor {
+    margin-top: 12px;
+}
+
+.notification-item-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
 .announcement-preview-shell {
+    margin-top: 8px;
     display: flex;
     flex-direction: column;
     gap: 8px;

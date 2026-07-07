@@ -10,13 +10,61 @@ const themeVars = inject(uiThemeKey)!;
 const searchText = ref('');
 const router = useRouter();
 
+function parsePathLikeInput(input: string) {
+    try {
+        return new URL(input).pathname;
+    } catch {
+        if (/^(?:www\.)?luogu\.com(?:\.cn)?\//i.test(input)) {
+            return new URL(`https://${input}`).pathname;
+        }
+        return input.startsWith('/') ? input : '';
+    }
+}
+
 const handleSearch = () => {
     const query = searchText.value.trim();
     if (!query) return;
 
-    const articleMatch = query.match(/luogu\.com(?:\.cn)?\/article\/([A-Za-z0-9]+)/);
-    if (articleMatch?.[1]) {
-        router.push(`/article/${articleMatch[1]}`);
+    const path = parsePathLikeInput(query);
+    const articlePathMatch = path.match(/^\/article\/([A-Za-z0-9_-]+)\/?$/);
+    if (articlePathMatch?.[1]) {
+        router.push(`/article/${articlePathMatch[1]}`);
+        return;
+    }
+
+    const pastePathMatch = path.match(/^\/paste\/([A-Za-z0-9_-]+)\/?$/);
+    if (pastePathMatch?.[1]) {
+        router.push(`/paste/${pastePathMatch[1]}`);
+        return;
+    }
+
+    const userPathMatch = path.match(/^\/user\/(\d+)\/?$/);
+    if (userPathMatch?.[1]) {
+        router.push(`/user/${userPathMatch[1]}`);
+        return;
+    }
+
+    const explicitArticleMatch = query.match(/^article\s*[:：]\s*([A-Za-z0-9_-]+)$/i);
+    if (explicitArticleMatch?.[1]) {
+        router.push(`/article/${explicitArticleMatch[1]}`);
+        return;
+    }
+
+    const explicitPasteMatch = query.match(/^paste\s*[:：]\s*([A-Za-z0-9_-]+)$/i);
+    if (explicitPasteMatch?.[1]) {
+        router.push(`/paste/${explicitPasteMatch[1]}`);
+        return;
+    }
+
+    const explicitUserMatch = query.match(/^(?:user|uid|用户)\s*[:：]\s*(\d+)$/i);
+    if (explicitUserMatch?.[1]) {
+        router.push(`/user/${explicitUserMatch[1]}`);
+        return;
+    }
+
+    const numericUidMatch = query.match(/^[1-9]\d*$/);
+    if (numericUidMatch) {
+        router.push(`/user/${query}`);
         return;
     }
 

@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import { TaskService } from '@/services/task.service';
 import { emitToRoom } from '@/lib/socket';
 import { FlowManager } from '@/workers/flow-manager';
+import { normalizeErrorReason } from '@/utils/error-reason';
 
 export class WorkerHost<T extends CommonTask> {
     public worker: Worker<T>;
@@ -129,18 +130,19 @@ export class WorkerHost<T extends CommonTask> {
             const isFinalAttempt = job && job.attemptsMade >= (job.opts.attempts || 1);
             const isUnrecoverable = err instanceof UnrecoverableError;
             if (isFinalAttempt || isUnrecoverable) {
+                const reason = normalizeErrorReason(err);
                 if (this.shouldEmitTaskEvent(job)) {
                     emitToRoom(`task:${job?.id}`, `task:${job?.id}:failed`, {
                         status: 'failed',
-                        error: err.message
+                        error: reason
                     });
                 }
                 logger.error({ jobId: job?.id, err }, 'Job failed PERMANENTLY.');
                 if (job?.id) {
                     if (job.data?.workflowId) {
-                        await FlowManager.handleWorkflowJobFailed(job, err.message);
+                        await FlowManager.handleWorkflowJobFailed(job, reason);
                     } else {
-                        await TaskService.updateTask(job.id, TaskStatus.FAILED, err.message);
+                        await TaskService.updateTask(job.id, TaskStatus.FAILED, reason);
                     }
                 }
             } else {

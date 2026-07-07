@@ -14,6 +14,7 @@ import {
     getServiceRepository,
     saveServiceEntity
 } from '@/services/helpers/repository.helper';
+import { normalizeErrorReason } from '@/utils/error-reason';
 import { logger } from '@/lib/logger';
 
 export type StartArticlePlazaDiscoveryInput = {
@@ -212,7 +213,7 @@ export class DiscoveryService {
     }
 
     static async markPageFailed(runId: string, error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = normalizeErrorReason(error);
         await getServiceRepository<DiscoveryRun>(DiscoveryRun).increment(
             { id: runId },
             'failedPages',
@@ -220,7 +221,7 @@ export class DiscoveryService {
         );
         await getServiceRepository<DiscoveryRun>(DiscoveryRun).update(
             { id: runId },
-            { lastError: message.slice(0, 4000) }
+            { lastError: message }
         );
         ArticleDiscoveryBroadcaster.scheduleRunsUpdate();
     }
@@ -289,10 +290,10 @@ export class DiscoveryService {
             ArticleDiscoveryBroadcaster.scheduleRunsUpdate();
             return { created: true, workflowId: workflow.workflowId };
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = normalizeErrorReason(error);
             await getServiceRepository<DiscoveredArticle>(DiscoveredArticle).update(row.id, {
                 status: DiscoveredArticleStatus.FAILED,
-                reason: message.slice(0, 4000)
+                reason: message
             });
             ArticleDiscoveryBroadcaster.scheduleRunsUpdate();
             logger.error({ error, input }, 'Failed to create workflow for discovered article');

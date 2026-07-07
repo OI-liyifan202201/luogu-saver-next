@@ -1,4 +1,5 @@
 import { Context, Next } from 'koa';
+import { normalizeErrorReason } from '@/utils/error-reason';
 
 function nomalizeError(err: unknown): Error & { status?: number } {
     if (err instanceof Error) {
@@ -20,7 +21,7 @@ export const responseHelper = async (ctx: Context, next: Next) => {
         ctx.status = 200;
         ctx.body = {
             code: code,
-            message: msg,
+            message: normalizeErrorReason(msg),
             data: data
         };
     };

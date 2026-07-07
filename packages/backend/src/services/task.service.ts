@@ -9,6 +9,7 @@ import {
     getServiceRepository,
     saveServiceEntity
 } from '@/services/helpers/repository.helper';
+import { normalizeErrorReason } from '@/utils/error-reason';
 
 export class TaskService {
     static async createTask(type: TaskType, payload: any, manager?: EntityManager): Promise<Task> {
@@ -50,7 +51,7 @@ export class TaskService {
     ) {
         const updateData: Partial<Task> = { status };
         if (info !== undefined) {
-            updateData.info = info;
+            updateData.info = status === TaskStatus.FAILED ? normalizeErrorReason(info) : info;
         }
         if (result !== undefined) {
             updateData.result = result;
@@ -78,11 +79,12 @@ export class TaskService {
     }
 
     static async failTask(taskId: string, info: string): Promise<boolean> {
+        const normalizedInfo = normalizeErrorReason(info);
         const updateResult = await getServiceRepository<Task>(Task).update(
             { id: taskId, status: Not(In([TaskStatus.COMPLETED, TaskStatus.FAILED])) },
             {
                 status: TaskStatus.FAILED,
-                info
+                info: normalizedInfo
             }
         );
         return Boolean(updateResult.affected && updateResult.affected > 0);

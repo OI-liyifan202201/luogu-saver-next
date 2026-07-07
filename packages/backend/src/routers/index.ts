@@ -13,6 +13,7 @@ import adminRouter from './admin.router';
 import markdownRouter from './markdown.router';
 import statsRouter from './stats.router';
 import announcementRouter from './announcement.router';
+import notificationRouter from './notification.router';
 import discoveryRouter from './discovery.router';
 import { DefaultState, Context } from 'koa';
 
@@ -32,6 +33,7 @@ router.use(adminRouter.routes(), adminRouter.allowedMethods());
 router.use(markdownRouter.routes(), markdownRouter.allowedMethods());
 router.use(statsRouter.routes(), statsRouter.allowedMethods());
 router.use(announcementRouter.routes(), announcementRouter.allowedMethods());
+router.use(notificationRouter.routes(), notificationRouter.allowedMethods());
 router.use(discoveryRouter.routes(), discoveryRouter.allowedMethods());
 
 export default router;

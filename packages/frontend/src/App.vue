@@ -63,6 +63,7 @@
                                             <n-icon :component="MenuOutline" />
                                         </template>
                                     </n-button>
+                                    <SiteNotificationCenter />
                                     <n-back-top :right="50" :bottom="200" />
                                     <router-view />
                                 </div>
@@ -270,6 +271,7 @@ import {
 import { darkTheme, defaultTheme } from '@/styles/theme/default-theme.ts';
 import TrackingConsent from '@/components/TrackingConsent.vue';
 import LuoguLogo from '@/components/icons/LuoguLogo.vue';
+import SiteNotificationCenter from '@/components/SiteNotificationCenter.vue';
 import { currentRole, isAuthenticated, setCurrentAuth } from '@/utils/auth.ts';
 import { hasAnyPermission, Permission, ROLE_ADMIN } from '@/utils/permissions.ts';
 import { getCurrentUser } from '@/api/auth.ts';

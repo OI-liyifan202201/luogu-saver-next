@@ -6,6 +6,7 @@ import { RegisteredUser } from '@/entities/registered-user';
 import { WorkflowService } from '@/services/workflow.service';
 import { RegisteredUserService } from '@/services/registered-user.service';
 import { AnnouncementService } from '@/services/announcement.service';
+import { SiteNotificationService } from '@/services/site-notification.service';
 
 const router = new Router<DefaultState, Context>({ prefix: '/admin' });
 
@@ -128,6 +129,26 @@ router.put(
     async (ctx: Context) => {
         const announcement = await AnnouncementService.updateAnnouncement(ctx.request.body || {});
         ctx.success(announcement);
+    }
+);
+
+router.get(
+    '/notifications',
+    requiresPermission(Permission.MANAGE_ANNOUNCEMENTS),
+    async (ctx: Context) => {
+        const notifications = await SiteNotificationService.getAdminNotifications();
+        ctx.success({ notifications });
+    }
+);
+
+router.put(
+    '/notifications',
+    requiresPermission(Permission.MANAGE_ANNOUNCEMENTS),
+    async (ctx: Context) => {
+        const notifications = await SiteNotificationService.replaceAdminNotifications(
+            ctx.request.body || {}
+        );
+        ctx.success({ notifications });
     }
 );
 

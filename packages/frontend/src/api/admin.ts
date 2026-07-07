@@ -1,6 +1,7 @@
 import { apiFetch } from '@/utils/request.ts';
 import type { ApiResponse } from '@/types/common';
 import type { Announcement } from '@/api/announcement.ts';
+import type { NotificationChannel } from '@/api/notification.ts';
 
 export interface AdminUser {
     id: number;
@@ -27,6 +28,18 @@ export interface DiscoveryRun {
     finishedAt: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface AdminSiteNotification {
+    id?: number;
+    channel: NotificationChannel;
+    title: string;
+    content: string;
+    enabled: boolean;
+    loginOnly: boolean;
+    sortOrder: number;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 interface CreateWorkflowTemplateResponse {
@@ -81,6 +94,19 @@ export async function updateAdminAnnouncement(data: {
         method: 'PUT',
         data
     })) as ApiResponse<Announcement>;
+}
+
+export async function getAdminNotifications() {
+    return (await apiFetch('/admin/notifications')) as ApiResponse<{
+        notifications: AdminSiteNotification[];
+    }>;
+}
+
+export async function updateAdminNotifications(notifications: AdminSiteNotification[]) {
+    return (await apiFetch('/admin/notifications', {
+        method: 'PUT',
+        data: { notifications }
+    })) as ApiResponse<{ notifications: AdminSiteNotification[] }>;
 }
 
 export async function startArticlePlazaDiscovery(data: {

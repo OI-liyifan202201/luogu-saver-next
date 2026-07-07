@@ -10,6 +10,7 @@ import { WorkflowStatusStore } from '@/services/helpers/workflow-status-store.he
 import { getServiceRepository } from '@/services/helpers/repository.helper';
 import { TaskService } from '@/services/task.service';
 import { WorkflowCleanupService } from '@/services/workflow-cleanup.service';
+import { normalizeErrorReason } from '@/utils/error-reason';
 import { Job } from 'bullmq';
 
 const TERMINAL_WORKFLOW_STATUSES = ['completed', 'failed', 'expired'];
@@ -17,14 +18,6 @@ const TERMINAL_TASK_STATUSES = [TaskStatus.COMPLETED, TaskStatus.FAILED];
 
 export class FlowManager {
     private static recoveryRunning = false;
-
-    static setupQueueEvents() {
-        logger.info('Workflow DAG manager uses worker events for runtime scheduling.');
-    }
-
-    static async closeQueueEvents() {
-        return;
-    }
 
     static async handleWorkflowJobCompleted(job: Job, returnvalue: any) {
         const workflowId = job.data?.workflowId;
@@ -91,20 +84,21 @@ export class FlowManager {
     static async handleWorkflowJobFailed(job: Job<any>, reason: string) {
         const workflowId = job.data?.workflowId;
         if (!job.id || !workflowId) return;
+        const normalizedReason = normalizeErrorReason(reason);
 
         logger.warn(
             {
                 workflowId,
                 taskId: job.id,
                 taskName: job.data?.taskName,
-                reason
+                reason: normalizedReason
             },
             'Workflow task failure received'
         );
 
-        const changed = await TaskService.failTask(job.id, reason);
+        const changed = await TaskService.failTask(job.id, normalizedReason);
         if (changed) {
-            await this.updateWorkflowStatus(workflowId, 'failed', reason);
+            await this.updateWorkflowStatus(workflowId, 'failed', normalizedReason);
         }
 
         logger.warn(
@@ -113,7 +107,7 @@ export class FlowManager {
                 taskId: job.id,
                 taskName: job.data?.taskName,
                 changed,
-                reason
+                reason: normalizedReason
             },
             'Workflow task failure processed'
         );
@@ -153,11 +147,15 @@ export class FlowManager {
     }
 
     static async updateWorkflowStatus(workflowId: string, status: string, reason?: string) {
+        const normalizedReason = reason === undefined ? undefined : normalizeErrorReason(reason);
         try {
             const storedStatus = await WorkflowStatusStore.updateById(workflowId, status);
 
             if (storedStatus === status) {
-                logger.info({ workflowId, status, reason }, 'Workflow status updated');
+                logger.info(
+                    { workflowId, status, reason: normalizedReason },
+                    'Workflow status updated'
+                );
                 if (TERMINAL_WORKFLOW_STATUSES.includes(status)) {
                     void WorkflowCleanupService.cleanupRuntimeForWorkflow(workflowId).catch(
                         error => {
@@ -174,7 +172,7 @@ export class FlowManager {
                         workflowId,
                         requestedStatus: status,
                         storedStatus,
-                        reason
+                        reason: normalizedReason
                     },
                     'Workflow status update skipped by terminal-state guard'
                 );
