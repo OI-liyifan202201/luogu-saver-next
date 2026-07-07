@@ -43,6 +43,7 @@ import { UserArticlesDiscoveryHandler } from '@/workers/handlers/task/discover/u
 import { config } from '@/config';
 import { WorkerOptions } from 'bullmq';
 import { FlowManager } from './flow-manager';
+import { WorkflowCleanupService } from '@/services/workflow-cleanup.service';
 
 export async function bootstrap() {
     const saveTaskPointGuard = new PointGuard(
@@ -95,8 +96,6 @@ export async function bootstrap() {
 
     discoverProcessor.registerHandler(new ArticlePlazaDiscoveryHandler());
     discoverProcessor.registerHandler(new UserArticlesDiscoveryHandler());
-
-    await FlowManager.recoverActiveWorkflows();
 
     const saveWorkerHost = new WorkerHost<SaveTask>(
         QUEUE_NAMES[TaskType.SAVE],
@@ -154,6 +153,7 @@ export async function bootstrap() {
 
     const closeWorkers = async () => {
         logger.info('Shutting down workers...');
+        WorkflowCleanupService.stop();
         await Promise.all([
             saveWorkerHost.close(),
             aiWorkerHost.close(),
@@ -177,5 +177,7 @@ export async function bootstrap() {
     });
 
     FlowManager.setupQueueEvents();
+    FlowManager.startRecoveryInBackground();
+    WorkflowCleanupService.start();
     logger.info('Worker hosts initialized and running.');
 }

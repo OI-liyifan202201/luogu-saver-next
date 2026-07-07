@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { ServerSchema } from './server';
 import { DbSchema, RedisSchema, ChromaSchema, MeilisearchSchema } from './infrastructure';
-import { ApiRateLimitSchema, DiscoverySchema, RecommendationSchema, QueueSchema } from './business';
+import {
+    ApiRateLimitSchema,
+    DiscoverySchema,
+    RecommendationSchema,
+    QueueSchema,
+    WorkflowMaintenanceSchema
+} from './business';
 import { LLMConfigSchema } from './llm';
 import { VerificationSchema } from './verification';
 import { AuthSchema } from './auth';
@@ -27,6 +33,7 @@ export const AppConfigSchema = ServerSchema.extend({
     queue: z.preprocess(value => value ?? {}, QueueSchema),
     discovery: z.preprocess(value => value ?? {}, DiscoverySchema),
     apiRateLimit: z.preprocess(value => value ?? {}, ApiRateLimitSchema),
+    workflow: z.preprocess(value => value ?? {}, WorkflowMaintenanceSchema),
     llm: LLMConfigSchema,
     verification: VerificationSchema,
     auth: z.preprocess(value => value ?? {}, AuthSchema)

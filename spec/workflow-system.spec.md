@@ -393,28 +393,53 @@ For each workflow task ID `taskId`, the scheduler MAY create these Redis keys:
 4. `workflow:task:result:{taskId}` stores `returnvalue.__result` after successful completion.
 5. `workflow:task:released:{taskId}` stores a marker that descendant counters were released for `taskId`.
 
-Runtime keys for active workflows SHALL NOT require a fixed expiration time. Runtime keys MAY be deleted after the workflow reaches a terminal status.
+Runtime keys for active workflows SHALL NOT require a fixed expiration time. Runtime keys SHALL be deleted after the workflow reaches a terminal status. The scheduled workflow cleanup pass SHALL also delete runtime keys for terminal workflows before deleting SQL rows.
 
 ## 8. Restart Recovery
 
-On worker startup, the backend SHALL perform one recovery pass before considering recovery complete:
+On worker startup, the backend SHALL start workflow recovery in the background. HTTP server startup SHALL NOT wait for recovery to complete.
 
-1. Select every workflow whose status is not `completed`, `failed`, or `expired`.
-2. Load every task row with `workflow_id = workflow.id`.
-3. Rebuild Redis runtime keys from `workflow.definition`, task rows, task statuses, task results, and task priorities.
-4. For each completed task row with a stored result, restore `workflow:task:result:{taskId}`.
-5. For each completed task row, create `workflow:task:released:{taskId}` because rebuilt counters already exclude completed fathers.
-6. If any workflow task row has `status = FAILED`, set the workflow status to `failed`.
-7. If every workflow task row has `status = COMPLETED`, set the workflow status to `completed`.
-8. For every non-terminal task whose BullMQ job exists and is `completed`, store its return value, mark the task `COMPLETED`, update tracked workflow result when applicable, and release descendants.
-9. For every non-terminal task whose BullMQ job exists and is `failed`, mark the task `FAILED` and set the workflow status to `failed`.
-10. For every task whose fathers are all completed, whose task row is not terminal, and whose BullMQ job is missing, add the task to BullMQ with `jobId = task.id`.
-11. For every task whose BullMQ job already exists in `waiting`, `delayed`, `prioritized`, or `active`, recovery MUST NOT add a duplicate job.
-12. If recovery for one workflow throws an error, set that workflow status to `failed` and continue recovery for the remaining workflows.
+The recovery process SHALL run in batches:
+
+1. Each batch SHALL load at most `config.workflow.recovery.batchSize` workflows whose status is not `completed`, `failed`, or `expired`.
+2. At most `config.workflow.recovery.concurrency` workflows SHALL be recovered concurrently.
+3. If another recovery pass is already running, a new recovery pass SHALL NOT start.
+4. If `config.workflow.recovery.enabled = false`, startup recovery SHALL NOT run.
+
+For each workflow selected by recovery:
+
+1. Load every task row with `workflow_id = workflow.id`.
+2. Rebuild Redis runtime keys from `workflow.definition`, task rows, task statuses, task results, and task priorities.
+3. For each completed task row with a stored result, restore `workflow:task:result:{taskId}`.
+4. For each completed task row, create `workflow:task:released:{taskId}` because rebuilt counters already exclude completed fathers.
+5. If any workflow task row has `status = FAILED`, set the workflow status to `failed`.
+6. If every workflow task row has `status = COMPLETED`, set the workflow status to `completed`.
+7. For every non-terminal task whose BullMQ job exists and is `completed`, store its return value, mark the task `COMPLETED`, update tracked workflow result when applicable, and release descendants.
+8. For every non-terminal task whose BullMQ job exists and is `failed`, mark the task `FAILED` and set the workflow status to `failed`.
+9. For every task whose fathers are all completed, whose task row is not terminal, and whose BullMQ job is missing, add the task to BullMQ with `jobId = task.id`.
+10. For every task whose BullMQ job already exists in `waiting`, `delayed`, `prioritized`, or `active`, recovery MUST NOT add a duplicate job.
+11. If recovery for one workflow throws an error, set that workflow status to `failed` and continue recovery for the remaining workflows.
 
 Recovery is idempotent. Running recovery more than once without new task completions MUST NOT enqueue more than one BullMQ job for the same task ID.
 
-## 9. Debug Logging
+## 9. SQL and Redis Cleanup
+
+The backend SHALL run a scheduled workflow cleanup pass when `config.workflow.cleanup.enabled = true`.
+
+Each cleanup pass SHALL:
+
+1. Select at most `config.workflow.cleanup.batchSize` workflows where `status IN ('completed', 'failed', 'expired')` and `updated_at < now - config.workflow.cleanup.terminalRetentionMs`.
+2. For each selected workflow, load task IDs where `task.workflow_id = workflow.id`.
+3. Delete Redis runtime keys for those task IDs.
+4. Delete SQL task rows where `task.workflow_id = workflow.id`.
+5. Delete the SQL workflow row.
+6. Delete at most `config.workflow.cleanup.batchSize` non-workflow task rows where `workflow_id IS NULL`, `status IN (COMPLETED, FAILED)`, and `updated_at < now - config.workflow.cleanup.legacyTaskRetentionMs`.
+
+Cleanup SHALL NOT delete non-terminal workflow rows. Cleanup SHALL NOT delete workflow task rows independently of their owning workflow row.
+
+If one workflow cleanup fails, the cleanup pass SHALL log the error and continue with remaining selected workflows.
+
+## 10. Debug Logging
 
 The backend SHALL write structured workflow logs that allow one workflow run to be reconstructed from log records:
 
@@ -428,7 +453,7 @@ The backend SHALL write structured workflow logs that allow one workflow run to 
 8. Workflow query logs SHALL include `workflowId`, `status`, `taskCount`, and counts by task status.
 9. Debug logs SHALL NOT include full workflow result payloads, full embeddings, article bodies, paste bodies, or LLM prompt text.
 
-## 10. Invariants
+## 11. Invariants
 
 1. `workflowId` is the only workflow identifier accepted by `/workflow/query/:id`.
 2. Every value in `taskIds` is both a `task.id` and a BullMQ job ID.

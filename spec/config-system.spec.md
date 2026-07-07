@@ -151,6 +151,23 @@ Default queue section values SHALL be:
 | `blockDuration` | number  | 60               | Block length in seconds after limit exhaustion |
 | `keyPrefix`     | string  | `api_rate_limit` | Redis key prefix for API rate limit counters   |
 
+### 3.8.1 Workflow Maintenance Configuration (`workflow`)
+
+| Field                           | Type    | Default   | Description                                      |
+| ------------------------------- | ------- | --------- | ------------------------------------------------ |
+| `recovery.enabled`              | boolean | true      | Enable startup workflow recovery                 |
+| `recovery.batchSize`            | number  | 100       | Maximum workflows loaded per recovery batch      |
+| `recovery.concurrency`          | number  | 2         | Maximum workflows recovered concurrently         |
+| `recovery.yieldMs`              | number  | 50        | Delay between recovery batches                   |
+| `cleanup.enabled`               | boolean | true      | Enable scheduled workflow/task cleanup           |
+| `cleanup.intervalMs`            | number  | 3600000   | Delay between cleanup passes                     |
+| `cleanup.terminalRetentionMs`   | number  | 604800000 | Retention for terminal workflows and their tasks |
+| `cleanup.legacyTaskRetentionMs` | number  | 604800000 | Retention for non-workflow terminal tasks        |
+| `cleanup.batchSize`             | number  | 100       | Maximum workflows or tasks deleted per pass      |
+| `cleanup.initialDelayMs`        | number  | 60000     | Delay before the first scheduled cleanup pass    |
+
+Workflow maintenance values SHALL be positive integers except `yieldMs`, which MAY be `0`.
+
 ### 3.9 LLM Rerank Scenario
 
 `llm.scenarios.rerank.use` is optional.

@@ -16,6 +16,7 @@ Table name: `task`
 | `info`        | TEXT        | NULLABLE    | Task result/error information                |
 | `status`      | INT         | DEFAULT 0   | Task status (TaskStatus enum)                |
 | `created_at`  | DATETIME    | NOT NULL    | Task creation timestamp                      |
+| `updated_at`  | DATETIME    | NOT NULL    | Task last update timestamp                   |
 | `type`        | VARCHAR     | NOT NULL    | Task type (TaskType enum)                    |
 | `target`      | VARCHAR     | NULLABLE    | Target identifier (e.g., "article", "paste") |
 | `payload`     | JSON        | NOT NULL    | Task-specific payload data                   |
@@ -214,6 +215,16 @@ The `getQueueByName(queueName)` function:
 4. If `pendingCount < maxQueueLength`, add the job using BullMQ.
 5. The `active`, `completed`, and `failed` states SHALL NOT count toward `maxQueueLength`.
 
+Every BullMQ queue SHALL set default job options:
+
+1. `removeOnComplete = 100`.
+2. `removeOnFail = 500`.
+3. `attempts = 3`.
+4. `backoff.type = 'exponential'`.
+5. `backoff.delay = 1000`.
+
+These defaults bound Redis job history for completed and failed jobs.
+
 `WorkflowService.createWorkflow(definition)` SHALL:
 
 1. Compute every BullMQ queue used by the workflow before inserting workflow rows, task rows, or Redis runtime keys.
@@ -234,6 +245,17 @@ The `closeAllQueues()` function:
 
 1. Close all queues in the pool.
 2. Clear the queue pool.
+
+### 6.3 SQL Task Cleanup
+
+The scheduled workflow cleanup pass SHALL delete non-workflow task rows when all conditions are true:
+
+1. `workflow_id IS NULL`.
+2. `status IN (COMPLETED, FAILED)`.
+3. `updated_at < now - config.workflow.cleanup.legacyTaskRetentionMs`.
+
+Each cleanup pass SHALL delete at most `config.workflow.cleanup.batchSize` non-workflow task rows.
+Non-terminal task rows SHALL NOT be deleted by scheduled cleanup.
 
 ## 7. Task Processor
 

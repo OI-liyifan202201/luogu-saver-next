@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { BaseEntity } from './base';
 import { TaskStatus, TaskType } from '@/shared/task';
 
@@ -15,6 +15,9 @@ export class Task extends BaseEntity {
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at' })
+    updatedAt: Date;
 
     @Column({ type: 'varchar' })
     type: TaskType;

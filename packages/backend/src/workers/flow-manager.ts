@@ -1,5 +1,6 @@
 import { Task } from '@/entities/task';
 import { Workflow } from '@/entities/workflow';
+import { config } from '@/config';
 import { getQueueByName } from '@/lib/queue-factory';
 import { logger } from '@/lib/logger';
 import { QUEUE_NAMES } from '@/shared/constants';
@@ -8,13 +9,15 @@ import { WorkflowHelper } from '@/services/helpers/workflow.helper';
 import { WorkflowStatusStore } from '@/services/helpers/workflow-status-store.helper';
 import { getServiceRepository } from '@/services/helpers/repository.helper';
 import { TaskService } from '@/services/task.service';
+import { WorkflowCleanupService } from '@/services/workflow-cleanup.service';
 import { Job } from 'bullmq';
-import { In, Not } from 'typeorm';
 
 const TERMINAL_WORKFLOW_STATUSES = ['completed', 'failed', 'expired'];
 const TERMINAL_TASK_STATUSES = [TaskStatus.COMPLETED, TaskStatus.FAILED];
 
 export class FlowManager {
+    private static recoveryRunning = false;
+
     static setupQueueEvents() {
         logger.info('Workflow DAG manager uses worker events for runtime scheduling.');
     }
@@ -155,6 +158,16 @@ export class FlowManager {
 
             if (storedStatus === status) {
                 logger.info({ workflowId, status, reason }, 'Workflow status updated');
+                if (TERMINAL_WORKFLOW_STATUSES.includes(status)) {
+                    void WorkflowCleanupService.cleanupRuntimeForWorkflow(workflowId).catch(
+                        error => {
+                            logger.error(
+                                { err: error, workflowId, status },
+                                'Failed to clean workflow runtime keys after terminal status update'
+                            );
+                        }
+                    );
+                }
             } else {
                 logger.debug(
                     {
@@ -172,26 +185,104 @@ export class FlowManager {
     }
 
     static async recoverActiveWorkflows() {
-        const workflows = await getServiceRepository<Workflow>(Workflow).find({
-            where: { status: Not(In(TERMINAL_WORKFLOW_STATUSES)) }
-        });
-
-        logger.info({ count: workflows.length }, 'Workflow recovery pass started');
-
-        for (const workflow of workflows) {
-            try {
-                await this.recoverWorkflow(workflow);
-            } catch (error) {
-                logger.error({ err: error, workflowId: workflow.id }, 'Workflow recovery failed');
-                await this.updateWorkflowStatus(
-                    workflow.id,
-                    'failed',
-                    error instanceof Error ? error.message : String(error)
-                );
-            }
+        const recoveryConfig = config.workflow.recovery;
+        if (!recoveryConfig.enabled) {
+            logger.info('Workflow recovery disabled.');
+            return;
         }
 
-        logger.info({ count: workflows.length }, 'Workflow recovery pass completed');
+        if (this.recoveryRunning) {
+            logger.debug('Workflow recovery pass skipped because another pass is running');
+            return;
+        }
+
+        this.recoveryRunning = true;
+        let recoveredCount = 0;
+        let selectedCount = 0;
+        let lastCreatedAt: Date | null = null;
+        let lastId: string | null = null;
+
+        try {
+            logger.info(
+                {
+                    batchSize: recoveryConfig.batchSize,
+                    concurrency: recoveryConfig.concurrency,
+                    yieldMs: recoveryConfig.yieldMs
+                },
+                'Workflow recovery pass started'
+            );
+
+            while (true) {
+                const query = getServiceRepository<Workflow>(Workflow)
+                    .createQueryBuilder('workflow')
+                    .where('workflow.status NOT IN (:...statuses)', {
+                        statuses: TERMINAL_WORKFLOW_STATUSES
+                    })
+                    .orderBy('workflow.createdAt', 'ASC')
+                    .addOrderBy('workflow.id', 'ASC')
+                    .take(recoveryConfig.batchSize);
+
+                if (lastCreatedAt && lastId) {
+                    query.andWhere(
+                        '(workflow.createdAt > :lastCreatedAt OR (workflow.createdAt = :lastCreatedAt AND workflow.id > :lastId))',
+                        { lastCreatedAt, lastId }
+                    );
+                }
+
+                const batch = await query.getMany();
+
+                if (batch.length === 0) break;
+
+                selectedCount += batch.length;
+                const lastWorkflow = batch[batch.length - 1];
+                lastCreatedAt = lastWorkflow.createdAt;
+                lastId = lastWorkflow.id;
+                logger.info(
+                    {
+                        batchSize: batch.length,
+                        lastWorkflowId: lastId,
+                        concurrency: recoveryConfig.concurrency
+                    },
+                    'Workflow recovery batch started'
+                );
+
+                await this.runWithConcurrency(batch, recoveryConfig.concurrency, async workflow => {
+                    try {
+                        await this.recoverWorkflow(workflow);
+                        recoveredCount += 1;
+                    } catch (error) {
+                        logger.error(
+                            { err: error, workflowId: workflow.id },
+                            'Workflow recovery failed'
+                        );
+                        await this.updateWorkflowStatus(
+                            workflow.id,
+                            'failed',
+                            error instanceof Error ? error.message : String(error)
+                        );
+                    }
+                });
+
+                if (recoveryConfig.yieldMs > 0) {
+                    await this.delay(recoveryConfig.yieldMs);
+                }
+            }
+
+            logger.info({ selectedCount, recoveredCount }, 'Workflow recovery pass completed');
+        } finally {
+            this.recoveryRunning = false;
+        }
+    }
+
+    static startRecoveryInBackground() {
+        if (!config.workflow.recovery.enabled) {
+            logger.info('Workflow startup recovery disabled.');
+            return;
+        }
+
+        void this.recoverActiveWorkflows().catch(error => {
+            logger.error({ err: error }, 'Workflow startup recovery failed');
+        });
     }
 
     private static async recoverWorkflow(workflow: Workflow) {
@@ -388,5 +479,27 @@ export class FlowManager {
         }
 
         return counts;
+    }
+
+    private static async runWithConcurrency<T>(
+        items: T[],
+        concurrency: number,
+        worker: (item: T) => Promise<void>
+    ) {
+        let index = 0;
+        const workerCount = Math.min(concurrency, items.length);
+        await Promise.all(
+            Array.from({ length: workerCount }, async () => {
+                while (index < items.length) {
+                    const currentIndex = index;
+                    index += 1;
+                    await worker(items[currentIndex]);
+                }
+            })
+        );
+    }
+
+    private static delay(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }

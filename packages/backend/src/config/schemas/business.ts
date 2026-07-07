@@ -43,6 +43,45 @@ export const ApiRateLimitSchema = z.object({
     keyPrefix: z.string().default('api_rate_limit')
 });
 
+export const WorkflowMaintenanceSchema = z.object({
+    recovery: z.preprocess(
+        value => value ?? {},
+        z.object({
+            enabled: z.boolean().default(true),
+            batchSize: z.number().int().positive().default(100),
+            concurrency: z.number().int().positive().default(2),
+            yieldMs: z.number().int().min(0).default(50)
+        })
+    ),
+    cleanup: z.preprocess(
+        value => value ?? {},
+        z.object({
+            enabled: z.boolean().default(true),
+            intervalMs: z
+                .number()
+                .int()
+                .positive()
+                .default(60 * 60 * 1000),
+            terminalRetentionMs: z
+                .number()
+                .int()
+                .positive()
+                .default(7 * 24 * 60 * 60 * 1000),
+            legacyTaskRetentionMs: z
+                .number()
+                .int()
+                .positive()
+                .default(7 * 24 * 60 * 60 * 1000),
+            batchSize: z.number().int().positive().default(100),
+            initialDelayMs: z
+                .number()
+                .int()
+                .min(0)
+                .default(60 * 1000)
+        })
+    )
+});
+
 export const DiscoverySchema = z.object({
     articlePlaza: z.preprocess(
         value => value ?? {},
