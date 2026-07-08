@@ -25,10 +25,10 @@ export class User extends BaseEntity {
     @Column({ type: 'text', nullable: true })
     slogan: string | null;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ type: 'mediumtext', nullable: true })
     introduction: string | null;
 
-    @Column({ name: 'rendered_introduction', type: 'text', nullable: true })
+    @Column({ name: 'rendered_introduction', type: 'mediumtext', nullable: true })
     renderedIntroduction: string | null;
 
     @Column({ type: 'json', nullable: true })

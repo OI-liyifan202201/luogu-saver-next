@@ -24,8 +24,8 @@ Table name: `user`
 | `ccf_level`             | INT          | NOT NULL, DEFAULT `0` | OI / CCF certification level (`0` = none)                          |
 | `xcpc_level`            | INT          | NOT NULL, DEFAULT `0` | ICPC / CCPC certification level (`0` = none)                       |
 | `slogan`                | TEXT         | NULLABLE              | Short profile tagline as raw text                                  |
-| `introduction`          | TEXT         | NULLABLE              | Long profile introduction as raw Markdown                          |
-| `rendered_introduction` | TEXT         | NULLABLE              | HTML rendered from `introduction` via the shared markdown pipeline |
+| `introduction`          | MEDIUMTEXT   | NULLABLE              | Long profile introduction as raw Markdown                          |
+| `rendered_introduction` | MEDIUMTEXT   | NULLABLE              | HTML rendered from `introduction` via the shared markdown pipeline |
 | `prizes`                | JSON         | NULLABLE              | Array of `UserPrize` records; `NULL` if not fetched                |
 | `profile_fetched_at`    | DATETIME     | NULLABLE              | Timestamp of the last successful profile fetch                     |
 | `created_at`            | DATETIME     | NOT NULL              | Record creation timestamp                                          |
@@ -163,7 +163,7 @@ The handler is registered in `packages/backend/src/workers/index.ts` alongside `
     - `slogan: string | null` from `response.data.user.slogan`; treat empty strings and non-strings as `null`
     - `introduction: string | null` from `response.data.user.introduction`; treat empty strings and non-strings as `null`
     - `prizes: UserPrize[]` from `response.data.prizes`. Each element of `response.data.prizes` is a one-level wrapper `{ prize: LuoguPrize }`; the handler MUST unwrap the inner `prize` object before storing. Despite the name, `response.data.user.prize` is unrelated and may be empty; do NOT read from it. Default to `[]` if `response.data.prizes` is absent or non-array.
-5. If `introduction !== null`, render it via the shared `renderMarkdown` pipeline (`@luogu-saver-next/markdown-renderer`, re-exported by `packages/backend/src/lib/markdown.ts`) to produce `renderedIntroduction: string`. Otherwise `renderedIntroduction = null`. The handler does not memoize this; idempotent re-runs re-render.
+5. If `introduction !== null`, render it via the shared `renderMarkdown` pipeline (`@luogu-saver-next/markdown-renderer`, re-exported by `packages/backend/src/lib/markdown.ts`) to produce `renderedIntroduction: string`. Otherwise `renderedIntroduction = null`. The handler does not memoize this; idempotent re-runs re-render. The storage column for both `introduction` and `renderedIntroduction` SHALL be `MEDIUMTEXT`; the profile task SHALL NOT fail for values that exceed MariaDB `TEXT` capacity but fit in `MEDIUMTEXT`.
 6. Build the incoming profile snapshot:
     ```typescript
     {
