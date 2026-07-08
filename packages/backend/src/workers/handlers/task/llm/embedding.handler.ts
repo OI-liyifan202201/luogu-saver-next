@@ -95,16 +95,17 @@ export class EmbeddingHandler implements TaskHandler<AiTask> {
 
         const chunks = articleContent ? EmbeddingService.splitArticleContent(articleContent) : [];
         const summaryEmbedding = (await llm.embedding(summaryDocument)).embedding;
-        const chunkRecords = await Promise.all(
-            chunks.map(async chunk => ({
+        const chunkRecords: TaskEmbeddingRecord[] = [];
+        for (const chunk of chunks) {
+            chunkRecords.push({
                 kind: 'chunk' as const,
                 document: chunk.text,
                 embedding: (await llm.embedding(chunk.text)).embedding,
                 chunkIndex: chunk.index,
                 start: chunk.start,
                 end: chunk.end
-            }))
-        );
+            });
+        }
         const embeddingRecords: TaskEmbeddingRecord[] = [
             {
                 kind: 'summary',

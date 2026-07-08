@@ -185,6 +185,7 @@ Permission: public (`null` permission mapping).
 Task `embedding` SHALL have type `llm`, target `embedding`, and metadata `{ "mode": "article_index" }`.
 Task `embedding` SHALL read `save.data.text` and `summary.data.text` from its direct fathers.
 Task `embedding` SHALL generate one summary embedding record and zero or more chunk embedding records.
+Task `embedding` SHALL issue upstream embedding requests sequentially. It SHALL NOT request multiple chunk embeddings concurrently inside one task execution.
 Task `embedding` SHALL return `data.embeddingRecords` where each item contains `kind`, `document`, and `embedding`, and chunk items also contain `chunkIndex`, `start`, and `end`.
 Task `update-embedding` SHALL read upstream `embedding.data.embeddingRecords` and write vectors to the embedding store.
 Task `update-embedding` SHALL NOT call any LLM provider.

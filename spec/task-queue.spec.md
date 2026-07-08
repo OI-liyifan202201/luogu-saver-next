@@ -320,6 +320,10 @@ Queue behavior is controlled by `config.queue`:
 | `regenerationInterval` | Token regeneration interval in ms       |
 | `maxQueueLength`       | Maximum pending jobs in queue           |
 
+For queues that use `PointGuard` rate limiting, `maxRequestToken` is the token bucket capacity.
+`regenerationSpeed` is the number of tokens regenerated per `regenerationInterval` milliseconds.
+The runtime regeneration rate SHALL equal `(regenerationSpeed / regenerationInterval) * 1000` tokens per second.
+
 `config.queue` SHALL contain separate sections for `save`, `ai`, `update`, `search`, `read`, `rag`, and `discover`.
 
 The `search` worker SHALL use `config.queue.search.concurrencyLimit`.

@@ -45,17 +45,24 @@ import { WorkerOptions } from 'bullmq';
 import { FlowManager } from './flow-manager';
 import { WorkflowCleanupService } from '@/services/workflow-cleanup.service';
 
+function getPointGuardRate(regenerationSpeed: number, regenerationInterval: number) {
+    return (regenerationSpeed / regenerationInterval) * 1000;
+}
+
 export async function bootstrap() {
     const saveTaskPointGuard = new PointGuard(
         'save_task_guard',
         config.queue.save.maxRequestToken,
-        (1 / config.queue.save.regenerationInterval) * 1000
+        getPointGuardRate(
+            config.queue.save.regenerationSpeed,
+            config.queue.save.regenerationInterval
+        )
     );
     const saveProcessor = new TaskProcessor<SaveTask>();
     const aiTaskPointGuard = new PointGuard(
         'ai_task_guard',
         config.queue.ai.maxRequestToken,
-        (1 / config.queue.ai.regenerationInterval) * 1000
+        getPointGuardRate(config.queue.ai.regenerationSpeed, config.queue.ai.regenerationInterval)
     );
     const aiProcessor = new TaskProcessor<AiTask>();
     const updateProcessor = new TaskProcessor<UpdateTask>();
