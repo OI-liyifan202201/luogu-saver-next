@@ -13,14 +13,14 @@ import {
     useMessage
 } from 'naive-ui';
 import {
-    ArrowBackOutline,
-    CalendarOutline,
-    ClipboardOutline,
-    CopyOutline,
-    OpenOutline,
-    SyncOutline,
-    TrashOutline
-} from '@vicons/ionicons5';
+    IconArrowLeft,
+    IconCalendar,
+    IconClipboard,
+    IconCopy,
+    IconExternalLink,
+    IconRefreshCw,
+    IconTrash2
+} from '@/utils/icons';
 
 import { getPasteById, savePaste } from '@/api/paste';
 import type { Paste } from '@/types/paste';
@@ -183,11 +183,11 @@ onMounted(() => {
                         </template>
 
                         <div v-if="paste">
-                            <Card :title="title" :icon="ClipboardOutline">
+                            <Card :title="title" :icon="IconClipboard">
                                 <div class="meta-row">
                                     <n-tag :bordered="false" size="small">
                                         <template #icon>
-                                            <NIcon :component="CalendarOutline" />
+                                            <NIcon :component="IconCalendar" />
                                         </template>
                                         更新于 {{ formatDate(paste.updatedAt) }}
                                     </n-tag>
@@ -208,7 +208,7 @@ onMounted(() => {
                                 <n-space>
                                     <n-button size="small" @click="router.go(-1)">
                                         <template #icon>
-                                            <NIcon :component="ArrowBackOutline" />
+                                            <NIcon :component="IconArrowLeft" />
                                         </template>
                                         返回
                                     </n-button>
@@ -220,25 +220,25 @@ onMounted(() => {
                                         target="_blank"
                                     >
                                         <template #icon>
-                                            <NIcon :component="OpenOutline" />
+                                            <NIcon :component="IconExternalLink" />
                                         </template>
                                         原站
                                     </n-button>
                                     <n-button size="small" secondary @click="handleCopy">
                                         <template #icon>
-                                            <NIcon :component="CopyOutline" />
+                                            <NIcon :component="IconCopy" />
                                         </template>
                                         源码
                                     </n-button>
                                     <n-button size="small" type="primary" @click="handleUpdate">
                                         <template #icon>
-                                            <NIcon :component="SyncOutline" />
+                                            <NIcon :component="IconRefreshCw" />
                                         </template>
                                         更新
                                     </n-button>
                                     <n-button size="small" type="error" ghost @click="handleDelete">
                                         <template #icon>
-                                            <NIcon :component="TrashOutline" />
+                                            <NIcon :component="IconTrash2" />
                                         </template>
                                         删除
                                     </n-button>
@@ -284,7 +284,7 @@ onMounted(() => {
     <div v-if="hasUpdate" class="update-floater">
         <n-button type="primary" circle size="large" class="shadow-button" @click="triggerRefresh">
             <template #icon>
-                <NIcon :component="SyncOutline" />
+                <NIcon :component="IconRefreshCw" />
             </template>
         </n-button>
     </div>
@@ -333,7 +333,7 @@ onMounted(() => {
 
 .info-item {
     min-height: 58px;
-    background: linear-gradient(180deg, var(--ui-panel-color), var(--ui-body-gradient-end));
+    background: var(--ui-panel-color);
     padding: 10px 12px;
     border-radius: var(--ui-card-radius);
     border: 1px solid var(--ui-border-color);

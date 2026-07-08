@@ -29,31 +29,29 @@ const radius = computed(() => themeVars.value.cardRadius);
 
 <style scoped>
 .sidebar-widget {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     padding: 16px;
-    background: var(--ui-translucent-card-color);
+    background: var(--ui-card-color);
     border: 1px solid var(--ui-border-color);
     box-shadow: var(--ui-card-shadow);
-    backdrop-filter: blur(14px);
 }
 
 .widget-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--ui-border-color);
 }
 
 .widget-icon {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .widget-title {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    letter-spacing: 0.5px;
 }
 
 .widget-content {

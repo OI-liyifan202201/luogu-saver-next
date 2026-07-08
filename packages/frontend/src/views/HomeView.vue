@@ -1,36 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted, inject } from 'vue';
-import { NEmpty, NGrid, NGi, NIcon, NStatistic, NDivider } from 'naive-ui';
-import { Newspaper, Clipboard, Megaphone } from '@vicons/ionicons5';
+import { ref, onMounted } from 'vue';
+import { NIcon } from 'naive-ui';
+import { IconNewspaper, IconClipboard, IconMegaphone } from '@/utils/icons';
 import { getArticleCount } from '@/api/article.ts';
 import { getPasteCount } from '@/api/paste.ts';
 import { getCurrentAnnouncement, type Announcement } from '@/api/announcement.ts';
-import ThemeEditor from '@/components/ThemeEditor.vue';
 import HomeHero from '@/components/HomeHero.vue';
 import Card from '@/components/Card.vue';
-import { uiThemeKey } from '@/styles/theme/themeKeys.ts';
 
 const articleCount = ref(0);
 const pasteCount = ref(0);
 const announcement = ref<Announcement | null>(null);
-// const saveUrl = ref('');
-
-const themeVars = inject(uiThemeKey)!;
 
 onMounted(async () => {
     getArticleCount().then(res => (articleCount.value = res.data.count));
     getPasteCount().then(res => (pasteCount.value = res.data.count));
     getCurrentAnnouncement().then(res => (announcement.value = res.data));
 });
-
-/*
-const handleSave = () => {
-	if (saveUrl.value) {
-		// TODO: Implement save
-		console.log('Save:', saveUrl.value);
-	}
-};
- */
 </script>
 
 <template>
@@ -38,72 +24,44 @@ const handleSave = () => {
         <HomeHero />
 
         <div class="main-content">
-            <n-grid :x-gap="20" :y-gap="20" cols="1 m:2 l:3" responsive="screen">
-                <n-gi span="1 m:1 l:2">
-                    <Card :title="announcement?.title || '公告'" class="home-card">
-                        <template #header-extra>
-                            <n-icon
-                                size="20"
-                                :component="Megaphone"
-                                :color="themeVars.primaryColor"
-                            />
-                        </template>
-                        <div
-                            v-if="announcement"
-                            class="announcement-content"
-                            v-html="announcement.content"
-                        ></div>
-                        <n-empty v-else description="暂无公告" />
-                    </Card>
-                </n-gi>
+            <Card
+                :title="announcement?.title || '公告'"
+                :icon="IconMegaphone"
+                class="announcement-card"
+            >
+                <div
+                    v-if="announcement"
+                    class="announcement-content"
+                    v-html="announcement.content"
+                ></div>
+                <p v-else class="announcement-empty">暂无公告</p>
+            </Card>
 
-                <n-gi>
-                    <Card class="home-card stat-card">
-                        <div class="stats-container">
-                            <div class="stat-item">
-                                <div
-                                    class="stat-icon-wrapper"
-                                    :style="{
-                                        backgroundColor:
-                                            'color-mix(in srgb, ' +
-                                            themeVars.primaryColor +
-                                            ' 12%, transparent)'
-                                    }"
-                                >
-                                    <n-icon
-                                        size="24"
-                                        :component="Newspaper"
-                                        :color="themeVars.primaryColor"
-                                    />
-                                </div>
-                                <n-statistic label="文章总数" :value="articleCount" />
-                            </div>
-                            <n-divider style="margin: 0" />
-                            <div class="stat-item">
-                                <div
-                                    class="stat-icon-wrapper"
-                                    :style="{
-                                        backgroundColor:
-                                            'color-mix(in srgb, ' +
-                                            themeVars.primaryColor +
-                                            ' 12%, transparent)'
-                                    }"
-                                >
-                                    <n-icon
-                                        size="24"
-                                        :component="Clipboard"
-                                        :color="themeVars.primaryColor"
-                                    />
-                                </div>
-                                <n-statistic label="剪贴板总数" :value="pasteCount" />
-                            </div>
-                        </div>
-                    </Card>
-                </n-gi>
-            </n-grid>
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <n-icon :component="IconNewspaper" size="18" />
+                    </div>
+                    <div class="stat-text">
+                        <span class="stat-label">文章总数</span>
+                        <span class="stat-value tabular-nums">{{
+                            articleCount.toLocaleString()
+                        }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <n-icon :component="IconClipboard" size="18" />
+                    </div>
+                    <div class="stat-text">
+                        <span class="stat-label">剪贴板总数</span>
+                        <span class="stat-value tabular-nums">{{
+                            pasteCount.toLocaleString()
+                        }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <ThemeEditor />
     </div>
 </template>
 
@@ -111,61 +69,95 @@ const handleSave = () => {
 .home-container {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 12px;
 }
 
+/* Matches the hero column so the whole page reads as one centered axis. */
 .main-content {
-    max-width: 1220px;
-    margin: 0 auto;
     width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.home-card {
-    min-height: 190px;
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
 }
 
-.stat-item {
+/* Same visual family as the hero feature cards: icon chip + two-line text. */
+.stat-card {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 8px 0;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--ui-card-color);
+    border: 1px solid var(--ui-border-color);
+    border-radius: var(--ui-card-radius);
 }
 
-.stat-icon-wrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--ui-card-radius);
+.stat-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 8px;
+    background: var(--ui-panel-color);
+    color: var(--ui-primary-color);
+}
+
+.stat-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stat-label {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ui-muted-text-color);
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--ui-card-title-color);
 }
 
 .announcement-content {
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1.8;
     color: var(--ui-secondary-text-color);
-    padding: 6px 0 0;
+}
+
+.announcement-empty {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ui-muted-text-color);
 }
 
 .announcement-content :deep(a) {
     color: var(--ui-link-color);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color 0.15s ease;
 }
 
 .announcement-content :deep(a:hover) {
     color: var(--ui-link-hover-color) !important;
 }
 
-.stats-container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-}
-
-.stat-card :deep(.n-statistic-value__content) {
-    color: var(--ui-card-title-color);
-    font-weight: 700;
+@media (max-width: 480px) {
+    .stats-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 </style>

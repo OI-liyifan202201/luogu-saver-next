@@ -13,14 +13,14 @@ import {
     useMessage
 } from 'naive-ui';
 import {
-    CheckmarkCircleOutline,
-    CloseCircleOutline,
-    CopyOutline,
-    GitNetworkOutline,
-    PlayCircleOutline,
-    SyncOutline,
-    TimeOutline
-} from '@vicons/ionicons5';
+    IconCircleCheck,
+    IconCircleX,
+    IconCopy,
+    IconNetwork,
+    IconCirclePlay,
+    IconRefreshCw,
+    IconClock
+} from '@/utils/icons';
 import Card from '@/components/Card.vue';
 import CardTitle from '@/components/CardTitle.vue';
 import {
@@ -187,11 +187,10 @@ function statusTagType(status: string) {
 }
 
 function statusIcon(status: string) {
-    if (status === 'completed') return CheckmarkCircleOutline;
-    if (status === 'failed' || status === 'missing' || status === 'expired')
-        return CloseCircleOutline;
-    if (status === 'processing' || status === 'active') return PlayCircleOutline;
-    return TimeOutline;
+    if (status === 'completed') return IconCircleCheck;
+    if (status === 'failed' || status === 'missing' || status === 'expired') return IconCircleX;
+    if (status === 'processing' || status === 'active') return IconCirclePlay;
+    return IconClock;
 }
 
 function childNames(taskName: string) {
@@ -218,13 +217,8 @@ onUnmounted(stopPolling);
 
 <template>
     <div class="workflow-page">
-        <CardTitle
-            title="工作流跟踪"
-            :icon="GitNetworkOutline"
-            class="workflow-title"
-            chip="Workflow"
-        >
-            DAG TASK TRACKING
+        <CardTitle title="工作流跟踪" :icon="IconNetwork" class="workflow-title" chip="Workflow">
+            查看保存任务的执行进度与依赖关系
         </CardTitle>
 
         <Card class="workflow-overview">
@@ -236,7 +230,7 @@ onUnmounted(stopPolling);
                             <code>{{ workflow.workflowId }}</code>
                             <n-button size="tiny" quaternary @click="copyWorkflowId">
                                 <template #icon>
-                                    <n-icon :component="CopyOutline" />
+                                    <n-icon :component="IconCopy" />
                                 </template>
                             </n-button>
                         </div>
@@ -252,7 +246,7 @@ onUnmounted(stopPolling);
                     <div class="overview-actions">
                         <n-button size="small" :loading="refreshing" @click="loadWorkflow(false)">
                             <template #icon>
-                                <n-icon :component="SyncOutline" />
+                                <n-icon :component="IconRefreshCw" />
                             </template>
                             刷新
                         </n-button>
