@@ -233,17 +233,31 @@ const goToDetail = (id: string) => {
 
 .article-item :deep(.saver-card) {
     width: 100%;
+    min-width: 0;
 }
 
 .article-item :deep(.card-content) {
     display: flex;
     flex: 1;
+    min-width: 0;
+}
+
+.article-item :deep(.card-header),
+.article-item :deep(.card-title-wrapper) {
+    min-width: 0;
+}
+
+.article-item :deep(.card-title) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
 .article-card-body {
     display: flex;
     flex: 1;
     flex-direction: column;
+    min-width: 0;
 }
 
 .article-meta-wrap {
@@ -255,10 +269,16 @@ const goToDetail = (id: string) => {
 }
 
 .article-summary {
+    display: -webkit-box;
+    overflow: hidden;
     color: var(--ui-secondary-text-color);
     font-size: 14px;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
     line-height: 1.65;
     margin-bottom: 6px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .article-meta {
