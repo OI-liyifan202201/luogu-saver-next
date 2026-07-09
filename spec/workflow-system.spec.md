@@ -46,16 +46,30 @@ The API accepts exactly this JSON shape:
 }
 ```
 
-Validation rules:
+Validation rules enforced by `validateFlowStructure`:
 
-1. `tasks` MUST be a non-empty array.
-2. Each task MUST have a unique non-empty `name`.
-3. If `fathers` is present, it MUST be an array of task names that exist in `tasks`.
-4. The logical graph defined by `fathers` MUST be acyclic.
+1. The workflow definition MUST be an object and MUST NOT be an array.
+2. `tasks` MUST be a non-empty array.
+3. Each task MUST have `name` as a truthy string. A whitespace-only string is accepted because no trim check is performed.
+4. Each task name MUST be unique by exact string equality.
 5. If `report` is present on a task, it MUST be a boolean.
-6. `track = true` means the task completion payload is written into `workflow.result[taskName]`.
-7. `report = true` means the task emits websocket completion/failure events for clients that join `task:{taskId}`.
-8. `track` and `report` are independent. A task MAY be tracked but not reported, or reported but not tracked.
+6. If `fathers` is present, it MUST be an array.
+7. Every father entry MUST exactly match one task name in the same `tasks` array.
+8. The logical graph defined by `fathers` MUST be acyclic.
+
+Validation rules not enforced by `validateFlowStructure`:
+
+1. `track` is not type-checked.
+2. `data` is not checked for presence or object type.
+3. `data.type` is not checked against the task type enum.
+4. `data.payload` is not checked for presence or object type.
+5. `data.payload.target` is not checked for presence or string type.
+
+Runtime semantics:
+
+1. `track = true` means the task completion payload is written into `workflow.result[taskName]`.
+2. `report = true` means the task emits websocket completion/failure events for clients that join `task:{taskId}`.
+3. `track` and `report` are independent. A task MAY be tracked but not reported, or reported but not tracked.
 
 ## 4. API Endpoints
 
@@ -64,6 +78,8 @@ Validation rules:
 Permission requirement: `CREATE_WORKFLOW`.
 
 Input: normalized workflow definition object as specified in section 3.
+
+If workflow creation throws, including validation errors, the HTTP endpoint catches the error and returns code `500` through `ctx.fail`.
 
 Output:
 
@@ -219,8 +235,9 @@ Required input: `targetId`.
 
 Task graph:
 
-1. `censor` (tracked, reported)
-2. `update-censor` depends on `censor`
+1. `read-article` (tracked)
+2. `censor` depends on `read-article` (tracked, reported)
+3. `update-censor` depends on `censor`
 
 Permission: `CREATE_WORKFLOW`.
 

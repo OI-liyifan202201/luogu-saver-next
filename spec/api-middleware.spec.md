@@ -10,7 +10,7 @@ For every HTTP request, after authorization middleware has completed, the system
 
 The client IP address SHALL be Koa `ctx.ip`.
 
-The client IP resolution rule SHALL NOT read request header `cf-connecting-ip`, request header `x-forwarded-for`, or any other forwarding header.
+The Koa application SHALL be constructed with `proxy=true` and `proxyIpHeader='CF-Connecting-IP'`. Therefore `ctx.ip` MAY be derived from request header `CF-Connecting-IP` when Koa accepts that header.
 
 The access log entry SHALL include:
 
@@ -50,7 +50,21 @@ The middleware order SHALL satisfy these constraints:
 
 The returned `message` SHALL be normalized by `task-queue.spec.md` failure reason normalization and have length at most 80 characters.
 
-## 6. File Locations
+## 6. Tracking Middleware
+
+The tracking middleware SHALL execute after request body parsing and before router execution.
+
+For each request:
+
+1. If request header `X-Consent-Tracking` is not exactly `true`, the middleware SHALL NOT attach `ctx.track`.
+2. If request header `X-Consent-Tracking` is exactly `true` and `ctx.userId` is present, the middleware SHALL NOT attach anonymous tracking behavior.
+3. If request header `X-Consent-Tracking` is exactly `true` and `ctx.userId` is absent, the middleware SHALL attach `ctx.track(event, data)`.
+4. `ctx.track(TrackingEvent.VIEW_ARTICLE, articleId)` SHALL read request header `X-Device-Id` as the anonymous device ID.
+5. If both the device ID and article ID are non-empty strings, the middleware SHALL call `RecommendationService.recordAnonymousBehavior(deviceId, articleId)`.
+
+The middleware uses `ctx.userId`; the authorization middleware stores authenticated identity on `ctx.user`. Unless another middleware sets `ctx.userId`, authenticated HTTP requests still follow the anonymous tracking branch when consent and device headers are present.
+
+## 7. File Locations
 
 - Entry point: `packages/backend/src/index.ts`
 - Client IP helper: `packages/backend/src/middlewares/client-ip.ts`
@@ -58,3 +72,4 @@ The returned `message` SHALL be normalized by `task-queue.spec.md` failure reaso
 - API rate limit middleware: `packages/backend/src/middlewares/api-rate-limit.ts`
 - Response helper middleware: `packages/backend/src/middlewares/response.ts`
 - Authorization middleware: `packages/backend/src/middlewares/authorization.ts`
+- Tracking middleware: `packages/backend/src/middlewares/tracking.ts`

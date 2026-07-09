@@ -167,7 +167,57 @@ The scheduler SHALL:
 4. Otherwise start one article plaza discovery run using the configured values.
 5. Log scheduler failures and keep the process running.
 
-## 7. WebSocket Updates
+## 7. REST API
+
+### 7.1 POST `/discover/article-plaza/start`
+
+Permission requirement: `MANAGE_DISCOVERY`.
+
+The endpoint SHALL pass the request body to `DiscoveryService.startArticlePlazaDiscovery`.
+
+On success, response data SHALL be:
+
+```json
+{
+    "runId": "<run.id>",
+    "taskIds": ["<task_id>"],
+    "run": {}
+}
+```
+
+If the service throws, the endpoint SHALL return code `500` through `ctx.fail`.
+
+### 7.2 POST `/discover/user/:uid/articles/start`
+
+Permission requirement: authenticated user with `role === ROLE_ADMIN`.
+
+If `ctx.user` is absent, the endpoint SHALL return 401. If `ctx.user.role !== ROLE_ADMIN`, the endpoint SHALL return 403.
+
+The endpoint SHALL pass `{ ...body, uid: ctx.params.uid }` to `DiscoveryService.startUserArticleDiscovery`.
+
+On success, response data SHALL be `{ runId, taskIds, run }`.
+
+If the service throws, the endpoint SHALL return code `400` through `ctx.fail`.
+
+### 7.3 GET `/discover/runs`
+
+Permission requirement: `MANAGE_DISCOVERY`.
+
+The endpoint SHALL normalize `limit` as `Number(ctx.query.limit) || 20` and return `DiscoveryService.listRuns(limit)`.
+
+### 7.4 GET `/discover/runs/:id`
+
+Permission requirement: `MANAGE_DISCOVERY`.
+
+If no run exists for `id`, the endpoint SHALL return 404. Otherwise it SHALL return the run object.
+
+### 7.5 POST `/discover/runs/:id/stop`
+
+Permission requirement: `MANAGE_DISCOVERY`.
+
+If no run exists for `id`, the endpoint SHALL return 404. Otherwise it SHALL call `DiscoveryService.stopRun(id)` and return `{ runId: id }`.
+
+## 8. WebSocket Updates
 
 Room `discovery:runs` SHALL publish event `discovery:runs:update`.
 

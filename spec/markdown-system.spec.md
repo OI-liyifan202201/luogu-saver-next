@@ -4,7 +4,7 @@
 
 This specification defines Markdown rendering behavior provided by `@luogu-saver-next/markdown-renderer` and consumed by the backend through `packages/backend/src/lib/markdown.ts`.
 
-## 2. Directive Containers
+## 2. Admonition Directive Containers
 
 Supported block container directive names are:
 
@@ -102,9 +102,9 @@ The checkbox inputs SHALL be disabled.
 
 ## 7. Unsupported Directives
 
-Only block container directives listed in Section 2 are supported.
+Only these custom directive names are supported: `info`, `warning`, `success`, `error`, `align`, `epigraph`, and the leaf directive `cute-table` when it satisfies Section 9.
 
-If the parser produces an inline text directive or a leaf directive, the renderer SHALL convert it back to literal Markdown text.
+If the parser produces an inline text directive, or a leaf directive other than a valid `cute-table` directive, the renderer SHALL convert it back to literal Markdown text.
 
 For input text `2023/12/15 9:29:37 [通过](https://www.luogu.com.cn/record/139634319)。`, the rendered HTML SHALL keep `9:29:37`, the link, and the trailing punctuation inside one paragraph element.
 
@@ -176,3 +176,33 @@ Below the line, the renderer SHALL display `——author` aligned to the right.
 The block width SHALL NOT exceed one quarter of its parent container width.
 
 The block SHALL be aligned to the right side of its parent container.
+
+## 11. Align Directive
+
+For a supported directive `:::align`, the renderer SHALL output one `div` element.
+
+The output class SHALL be `md-align-{value}` where `value` is resolved by this order:
+
+1. If directive attribute `class` exists, use that value.
+2. Else if the directive has any attribute key, use the first attribute key.
+3. Else use `center`.
+
+The directive body SHALL be rendered as the children of that `div`.
+
+## 12. Bilibili Image Conversion
+
+For a Markdown image whose URL starts with `bilibili:`, the renderer SHALL replace the image with one HTML block:
+
+1. The outer element SHALL be `div.bilibili-video-container`.
+2. The child SHALL be an `iframe` whose `src` starts with `https://player.bilibili.com/player.html?`.
+3. URL prefixes `BV`, `av`, and decimal numeric IDs SHALL map to `bvid` or `aid` query parameters.
+4. Optional query parameters `page` and `t` SHALL be copied; absent `page` defaults to `1`, absent `t` defaults to `0` and is omitted from the iframe URL.
+5. The iframe URL SHALL include `high_quality=1` and `autoplay=0`.
+
+## 13. Backend Endpoint
+
+`POST /markdown/render` SHALL accept request body `{ "markdown": string }`.
+
+The endpoint SHALL render `markdown` with the shared renderer and return `{ html }`.
+
+If `markdown` is absent, the endpoint SHALL render the empty string.

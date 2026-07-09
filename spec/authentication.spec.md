@@ -48,49 +48,9 @@ function authorization(ctx, next):
 
 ## 4. Article Display User Entity
 
-### 4.1 Schema
+The `user` table is used for Luogu display/profile data only. Its schema, cache behavior, and Luogu upsert semantics are owned by `user-system.spec.md`.
 
-Table name: `user`
-
-This table is used for article and paste author display only. It is populated from Luogu content data during save tasks. Authentication code SHALL NOT write to this table.
-
-| Column       | Type         | Constraints | Description                       |
-| ------------ | ------------ | ----------- | --------------------------------- |
-| `id`         | INT UNSIGNED | PRIMARY KEY | User ID (from Luogu)              |
-| `name`       | VARCHAR      | NOT NULL    | Display name                      |
-| `color`      | VARCHAR      | NOT NULL    | User color/badge (UserColor enum) |
-| `created_at` | DATETIME     | NOT NULL    | Record creation timestamp         |
-| `updated_at` | DATETIME     | NOT NULL    | Record update timestamp           |
-
-### 4.2 UserColor Enum
-
-```
-Gray    - Default/unrated
-Blue    - Rated user
-Green   - Higher rated user
-Orange  - Expert user
-Red     - Master user
-Purple  - Admin user
-Cheater - Flagged user
-```
-
-### 4.3 Caching
-
-The `User.findById(id)` method is cached for 3 days (259200 seconds) with key pattern `user:${id}`.
-
-UserService cached read methods SHALL bypass Redis cache reads and writes when an optional `manager` argument is provided.
-UserService read/write methods that accept an optional `manager` argument SHALL use that `EntityManager` for database access when it is provided.
-
-### 4.4 Luogu User Upsert
-
-The `UserService.upsertLuoguUser(data)` method SHALL:
-
-1. Throw an error if `data.id` is `undefined`.
-2. Use `data.id` as the unique user key.
-3. Insert a user row when no row exists for `data.id`.
-4. Update the existing row when a row exists for `data.id`.
-5. Execute as one database upsert operation so concurrent saves for the same user do not fail with a duplicate primary-key error.
-6. After a successful upsert, evict Redis cache key `user:{data.id}`.
+Authentication code SHALL NOT insert, update, or delete rows in the `user` table.
 
 ## 5. Registered User Entity
 
@@ -257,6 +217,10 @@ The legacy endpoint `POST /task/create` SHALL require `CREATE_TASK`.
 The legacy endpoint `POST /token/create` SHALL return 410 and SHALL NOT create a token row.
 
 The legacy endpoint `GET /token/inspect` SHALL return the current `registered_user.id`, `registered_user.role`, and `registered_user.created_at`.
+
+The legacy endpoint `POST /token/verify` SHALL accept body `{ uid }`. If `uid` is absent, it SHALL return 400. Otherwise it SHALL call `VerificationService.prepareForLuogu(uid)` and return `{ code, expireAt }`.
+
+The legacy endpoint `POST /token/permission` SHALL require `ctx.user.role === ROLE_ADMIN`. If that condition is false, it SHALL return 403. It SHALL reject missing `uid` or missing `role` with 400, reject self-role mutation with 400, reject a missing target registered user with 404, update the target role through `RegisteredUserService.updateRole`, and return `{ uid, role }`.
 
 The backend admin user endpoints SHALL require `MANAGE_USERS`.
 

@@ -25,7 +25,9 @@ The first existing file found SHALL be used. If no file is found, the system SHA
 
 ## 3. Configuration Schema
 
-The configuration is validated using Zod schemas. All fields have default values.
+The configuration is validated using Zod schemas. Field defaults are applied inside a top-level section after that top-level section exists or is preprocessed as an empty object.
+
+The top-level sections `db`, `redis`, `chroma`, `recommendation`, `llm`, and `verification` are required when a YAML file is parsed. The top-level sections `meilisearch`, `rag`, `queue`, `discovery`, `apiRateLimit`, `workflow`, and `auth` are preprocessed as empty objects when absent.
 
 ### 3.1 Server Configuration
 
@@ -63,6 +65,10 @@ The configuration is validated using Zod schemas. All fields have default values
 | `port`      | number | 6379        | Redis server port         |
 | `password`  | string | ""          | Redis password            |
 | `keyPrefix` | string | ""          | Prefix for all Redis keys |
+
+The direct ioredis client SHALL use `${redis.keyPrefix}:` as its `keyPrefix`, including the case where `redis.keyPrefix` is the empty string. When `redis.keyPrefix` is `""`, a logical Redis key `example` is stored as physical Redis key `:example`.
+
+BullMQ queues and workers SHALL use `redis.keyPrefix` as the BullMQ `prefix` value without appending a colon.
 
 ### 3.4 Chroma Configuration (`chroma`)
 
@@ -178,17 +184,21 @@ If present, the configured provider/model SHALL be called with the standard rera
 
 ### 3.10 LLM Scenario Parameters
 
-| Scenario  | Field         | Default    | Description                         |
-| --------- | ------------- | ---------- | ----------------------------------- |
-| `chat`    | `temperature` | 0.7        | Default chat sampling temperature   |
-| `chat`    | `topP`        | 0.95       | Default chat nucleus sampling value |
-| `summary` | `temperature` | 0.2        | Summary sampling temperature        |
-| `summary` | `topP`        | 0.9        | Summary nucleus sampling value      |
-| `answer`  | `use`         | `chat.use` | RAG final answer provider/model     |
-| `answer`  | `temperature` | 0.3        | RAG final answer temperature        |
-| `answer`  | `topP`        | 0.9        | RAG final answer top-p              |
-| `rerank`  | `temperature` | 0          | Rerank request temperature          |
-| `rerank`  | `topP`        | 1.0        | Rerank request top-p                |
+| Scenario    | Field         | Default    | Description                         |
+| ----------- | ------------- | ---------- | ----------------------------------- |
+| `chat`      | `use`         | required   | Default chat provider/model         |
+| `chat`      | `temperature` | 0.7        | Default chat sampling temperature   |
+| `chat`      | `topP`        | 0.95       | Default chat nucleus sampling value |
+| `summary`   | `use`         | required   | Summary provider/model              |
+| `summary`   | `temperature` | 0.2        | Summary sampling temperature        |
+| `summary`   | `topP`        | 0.9        | Summary nucleus sampling value      |
+| `answer`    | `use`         | `chat.use` | RAG final answer provider/model     |
+| `answer`    | `temperature` | 0.3        | RAG final answer temperature        |
+| `answer`    | `topP`        | 0.9        | RAG final answer top-p              |
+| `embedding` | `use`         | required   | Embedding provider/model            |
+| `rerank`    | `temperature` | 0          | Rerank request temperature          |
+| `rerank`    | `topP`        | 1.0        | Rerank request top-p                |
+| `censor`    | `use`         | required   | Content safety provider/model       |
 
 ## 4. Loading Behavior
 
@@ -201,10 +211,13 @@ If present, the configured provider/model SHALL be called with the standard rera
 
 ### 4.2 Missing File
 
-If the configuration file does not exist at the discovered path:
+If automatic discovery finds no candidate file, the system SHALL throw an error before constructing `ConfigLoader`.
+
+If `CONFIG_PATH` is set and the explicit file does not exist:
 
 - Log a warning message.
-- Use default values by parsing an empty object through the schema.
+- Parse an empty object through `AppConfigSchema`.
+- If required top-level sections are absent, schema validation MAY throw before the application starts.
 
 ### 4.3 Validation Errors
 

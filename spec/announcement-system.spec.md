@@ -87,7 +87,7 @@ Preconditions:
 
 1. `title` SHALL be converted to string and trimmed.
 2. `content` SHALL be converted to string.
-3. `enabled` SHALL be converted to boolean.
+3. `enabled` SHALL be converted by announcement boolean normalization: booleans are preserved, numbers are true except `0`, strings are true only when trimmed lowercase value is `true` or `1`, and all other values are false.
 
 Postconditions:
 
@@ -131,7 +131,7 @@ Preconditions:
 2. Each `channel` SHALL be `banner` or `popup`.
 3. Each `title` SHALL be converted to string and trimmed.
 4. Each `content` SHALL be converted to string.
-5. Each `enabled` and `loginOnly` SHALL be converted to boolean.
+5. Each `enabled` and `loginOnly` SHALL be converted with JavaScript `Boolean(value)` semantics.
 6. Each `sortOrder` SHALL be converted to an integer. Non-finite values SHALL become `0`.
 
 Postconditions:
@@ -167,7 +167,7 @@ Postconditions:
 
 1. Upsert one `notification_read_state` row for `(userId, notificationId)`.
 2. Persist `notification_updated_at` equal to the current notification `updated_at`.
-3. Persist `read_at` equal to current time.
+3. Persist `read_at` equal to current time. The exact persisted value MAY be supplied by TypeORM `@UpdateDateColumn` semantics during save.
 
 ## 5. API Endpoints
 

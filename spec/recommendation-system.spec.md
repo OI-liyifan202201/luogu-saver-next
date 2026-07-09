@@ -49,7 +49,7 @@ The `EmbeddingService` interfaces with ChromaDB for vector-based similarity sear
 1. Load non-deleted articles in ascending article ID order in batches of `batchSize`.
 2. For each article, generate one summary embedding from `article.summary` if non-empty after trimming; otherwise from `article.content`.
 3. For each article, split `article.content` into chunks of 4000 characters with 300 characters overlap and generate one embedding per chunk.
-4. Upsert all generated summary and chunk vectors into Chroma with article metadata `{ title, authorId, category, tags }` plus vector-level metadata.
+4. Upsert all generated summary and chunk vectors into Chroma with article metadata `{ title, authorId, category, tags }` plus vector-level metadata. The Chroma metadata field `tags` SHALL be a comma-separated string built from `article.tags`.
 5. Process at most `concurrency` articles at the same time inside each batch.
 6. Continue after per-article failures.
 7. Return `{ processed, updated, failed, failedArticleIds }`.
@@ -118,7 +118,7 @@ Get personalized recommendations for the plaza page.
 
 **Request:**
 
-- Query parameter: `count` (number, optional) - Number of recommendations (default: 10)
+- Query parameter: `count` (number, optional) - Number of recommendations. The current router parses it with `parseInt(value) || 10` and does not clamp lower or upper bounds.
 - Query parameter: `exclude` (string, optional) - Comma-separated article IDs that must not appear in the response. Empty IDs are ignored. Duplicate IDs are removed in first-seen order. At most the first 200 unique IDs are used.
 - Header: `X-Consent-Tracking` (string, optional) - If the value is exactly `true`, the request may use a device ID for consented anonymous personalization.
 - Header: `X-Device-Id` (string, optional) - Anonymous device identifier. This header is used only when `X-Consent-Tracking` is exactly `true`.
@@ -223,9 +223,10 @@ No Redis key is read or written by `getPublicRecommendations`.
 2. Get source article's author
 3. Get all articles by the same author
 4. For each author article:
-   a. Compute title similarity (string-similarity library)
-   b. If similarity >= config.recommendation.relevantThreshold:
-      Add to titleSimilarIds and finalResult
+    a. Compute `stringScore = string-similarity.compareTwoStrings(originTitle, article.title)`.
+    b. Compute `levenshteinScore = max(0, 1 - levenshteinDistance / min(originTitle.length, article.title.length))`.
+    c. Compute `similarity = max(stringScore, levenshteinScore)`.
+    d. If `similarity >= config.recommendation.relevantThreshold`, add the article ID to `titleSimilarIds` and `finalResult`.
 5. Append vector-similar articles (up to fromVector) to finalResult
 6. Fetch full article data
 7. Add reason field: "title" or "vector"
@@ -256,7 +257,7 @@ No Redis key is read or written by `getPublicRecommendations`.
 2. Vector search requires Chroma to be enabled; otherwise returns empty results.
 3. Profile vectors are normalized by the number of valid articles.
 4. Recent articles have higher weight in profile calculation.
-5. Title similarity uses the `string-similarity` library's `compareTwoStrings` function.
+5. Title similarity uses the greater value of `string-similarity` similarity and Levenshtein-derived similarity.
 6. Public recommendations do not require a device ID.
 7. Public recommendations do not read or write user-specific Redis keys.
 8. `GET /plaza/get` excludes all parsed `exclude` article IDs from both consented anonymous and public recommendation responses.

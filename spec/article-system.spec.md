@@ -10,24 +10,26 @@ The article system manages articles archived from Luogu. It provides storage, re
 
 Table name: `article`
 
-| Column             | Type         | Constraints             | Description                        |
-| ------------------ | ------------ | ----------------------- | ---------------------------------- |
-| `id`               | VARCHAR(8)   | PRIMARY KEY             | Article ID (Luogu LID)             |
-| `title`            | VARCHAR      | NOT NULL                | Article title                      |
-| `content`          | MEDIUMTEXT   | NOT NULL                | Markdown content                   |
-| `author_id`        | INT UNSIGNED | NOT NULL, FK -> user.id | Author user ID                     |
-| `category`         | INT          | NOT NULL                | Article category (ArticleCategory) |
-| `upvote`           | INT          | DEFAULT 0               | Upvote count                       |
-| `favor_count`      | INT          | DEFAULT 0               | Favorite count                     |
-| `solution_for_pid` | VARCHAR(50)  | NULLABLE                | Problem ID if this is a solution   |
-| `priority`         | INT          | DEFAULT 0               | Display priority                   |
-| `deleted`          | TINYINT      | DEFAULT 0               | Soft delete flag                   |
-| `tags`             | JSON         | NOT NULL                | Array of tag strings               |
-| `created_at`       | DATETIME     | NOT NULL                | Record creation timestamp          |
-| `updated_at`       | DATETIME     | NOT NULL                | Record update timestamp            |
-| `delete_reason`    | VARCHAR      | NULLABLE                | Reason for deletion                |
-| `content_hash`     | VARCHAR      | NULLABLE                | SHA-256 hash of content            |
-| `view_count`       | INT          | DEFAULT 0               | View count                         |
+| Column                | Type         | Constraints             | Description                        |
+| --------------------- | ------------ | ----------------------- | ---------------------------------- |
+| `id`                  | VARCHAR(8)   | PRIMARY KEY             | Article ID (Luogu LID)             |
+| `title`               | VARCHAR      | NOT NULL                | Article title                      |
+| `content`             | MEDIUMTEXT   | NOT NULL                | Markdown content                   |
+| `author_id`           | INT UNSIGNED | NOT NULL, FK -> user.id | Author user ID                     |
+| `category`            | INT          | NOT NULL                | Article category (ArticleCategory) |
+| `upvote`              | INT          | DEFAULT 0               | Upvote count                       |
+| `favor_count`         | INT          | DEFAULT 0               | Favorite count                     |
+| `solution_for_pid`    | VARCHAR(50)  | NULLABLE                | Problem ID if this is a solution   |
+| `priority`            | INT          | DEFAULT 0               | Display priority                   |
+| `deleted`             | TINYINT      | DEFAULT 0               | Soft delete flag                   |
+| `tags`                | JSON         | NOT NULL                | Array of tag strings               |
+| `created_at`          | DATETIME     | NOT NULL                | Record creation timestamp          |
+| `updated_at`          | DATETIME     | NOT NULL                | Record update timestamp            |
+| `delete_reason`       | VARCHAR      | NULLABLE                | Reason for deletion                |
+| `content_hash`        | VARCHAR      | NULLABLE                | SHA-256 hash of content            |
+| `view_count`          | INT          | DEFAULT 0               | View count                         |
+| `summary`             | TEXT         | NULLABLE                | LLM-generated article summary      |
+| `comments_fetched_at` | DATETIME     | NULLABLE                | Last successful comment fetch time |
 
 ### 2.2 Indexes
 
@@ -270,8 +272,9 @@ The update handler for `article_embedding_rebuild` SHALL:
 5. Before inserting chunk vectors for an article, delete existing Chroma chunk vectors with metadata `articleId=article.id` and `kind="chunk"`.
 6. Summary vectors SHALL use ID `article.id`; chunk vectors SHALL use ID `${article.id}:chunk:${index}`.
 7. Vector metadata SHALL include `{ articleId, kind, title, authorId, category, tags }`; chunk vectors SHALL also include `{ chunkIndex, start, end }`.
-8. Continue processing if one article fails and record that article ID in `failedArticleIds`.
-9. Return `{ processed, updated, failed, failedArticleIds }`.
+8. The Chroma metadata field `tags` SHALL be a comma-separated string built from `article.tags`.
+9. Continue processing if one article fails and record that article ID in `failedArticleIds`.
+10. Return `{ processed, updated, failed, failedArticleIds }`.
 
 The update handler for `article_embedding` SHALL:
 

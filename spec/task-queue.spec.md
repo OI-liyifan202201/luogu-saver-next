@@ -48,13 +48,14 @@ Table name: `task`
 
 ### 2.4 SaveTarget Enum
 
-| Value       | Description         |
-| ----------- | ------------------- |
-| `article`   | Luogu article       |
-| `paste`     | Luogu paste         |
-| `benben`    | Luogu benben (犇犇) |
-| `judgement` | Judgement record    |
-| `profile`   | User profile        |
+| Value       | Description            |
+| ----------- | ---------------------- |
+| `article`   | Luogu article          |
+| `paste`     | Luogu paste            |
+| `benben`    | Luogu benben (犇犇)    |
+| `judgement` | Judgement record       |
+| `profile`   | User profile           |
+| `comments`  | Luogu article comments |
 
 ## 3. Task Interfaces
 
@@ -108,6 +109,8 @@ interface AiTask extends CommonTask {
 
 Create and dispatch a new task.
 
+Permission requirement: `CREATE_TASK`.
+
 **Request Body:**
 
 ```json
@@ -132,6 +135,8 @@ Create and dispatch a new task.
 - 200: `{ taskId: string }`
 - 400: Invalid request body or missing required fields
 - 500: Server error
+
+Current validation reads `payload.target` before verifying that `payload` is an object. If `payload` is absent or null, the endpoint may throw and the response helper may return code `500`.
 
 **Side Effects:**
 
@@ -301,12 +306,34 @@ interface TaskHandler<T extends CommonTask> {
 
 ### 7.3 Registered Handlers
 
-| Handler Key              | Handler Class                | Description                       |
-| ------------------------ | ---------------------------- | --------------------------------- |
-| `save:article`           | ArticleHandler               | Fetch and save Luogu article      |
-| `save:paste`             | PasteHandler                 | Fetch and save Luogu paste        |
-| `save:profile`           | ProfileHandler               | Fetch and save Luogu user profile |
-| `discover:article_plaza` | ArticlePlazaDiscoveryHandler | Fetch Luogu article plaza pages   |
+| Handler Key                        | Handler Class                        | Description                              |
+| ---------------------------------- | ------------------------------------ | ---------------------------------------- |
+| `save:article`                     | ArticleHandler                       | Fetch and save Luogu article             |
+| `save:paste`                       | PasteHandler                         | Fetch and save Luogu paste               |
+| `save:comments`                    | CommentsHandler                      | Fetch and replace Luogu article comments |
+| `save:profile`                     | ProfileHandler                       | Fetch and save Luogu user profile        |
+| `llm:summary`                      | SummaryHandler                       | Generate article summary                 |
+| `llm:embedding`                    | EmbeddingHandler                     | Generate embeddings                      |
+| `llm:chat`                         | ChatHandler                          | Run chat scenario                        |
+| `llm:censor`                       | CensorHandler                        | Run content safety review                |
+| `update:article_summary`           | UpdateArticleSummaryHandler          | Persist article summary                  |
+| `update:article_summary_rebuild`   | UpdateArticleSummaryRebuildHandler   | Rebuild article summaries                |
+| `update:article_embedding`         | UpdateArticleEmbeddingHandler        | Persist article embeddings               |
+| `update:article_embedding_rebuild` | UpdateArticleEmbeddingRebuildHandler | Rebuild article embeddings               |
+| `update:censor`                    | UpdateCensorResultHandler            | Persist censorship result                |
+| `update:search_index`              | UpdateSearchIndexHandler             | Upsert one search document               |
+| `update:search_reindex`            | UpdateSearchReindexHandler           | Rebuild search index                     |
+| `search:article`                   | ArticleSearchHandler                 | Search articles by keyword               |
+| `search:vector`                    | VectorSearchHandler                  | Search articles by vector                |
+| `read:text`                        | ReadTextHandler                      | Read literal workflow text               |
+| `read:planned_query`               | ReadPlannedQueryHandler              | Read one planned query                   |
+| `read:article`                     | ReadArticleHandler                   | Read stored article content              |
+| `read:paste`                       | ReadPasteHandler                     | Read stored paste content                |
+| `rag:plan_queries`                 | RagPlanQueriesHandler                | Generate retrieval queries               |
+| `rag:context`                      | RagContextHandler                    | Build RAG context                        |
+| `rag:answer`                       | RagAnswerHandler                     | Generate final RAG answer                |
+| `discover:article_plaza`           | ArticlePlazaDiscoveryHandler         | Fetch Luogu article plaza pages          |
+| `discover:user_articles`           | UserArticlesDiscoveryHandler         | Fetch Luogu user article pages           |
 
 ## 8. Configuration
 
@@ -351,7 +378,7 @@ interface QueueStatsResponse {
 
 interface QueueStatsItem {
     name: string;
-    taskType: 'save' | 'llm' | 'update' | 'search' | 'read' | 'rag';
+    taskType: 'save' | 'llm' | 'update' | 'search' | 'read' | 'rag' | 'discover';
     label: string;
     concurrency: number;
     isPaused: boolean;
