@@ -16,6 +16,7 @@
                 >
                     <n-layout-sider
                         class="app-sider"
+                        :class="{ 'is-collapsed': collapsed }"
                         bordered
                         show-trigger="bar"
                         :collapsed="collapsed"
@@ -36,6 +37,9 @@
                             v-model:value="activeKey"
                             :collapsed="collapsed"
                             :collapsed-width="64"
+                            :collapsed-icon-size="24"
+                            :icon-size="24"
+                            :indent="20"
                             :options="menuOptions"
                             :responsive="true"
                             :accordion="true"
@@ -1007,16 +1011,21 @@ setInterval(() => {
     height: 72px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: var(--ui-control-gap);
+    padding: 0 16px;
+    overflow: hidden;
+    box-sizing: border-box;
     border-bottom: 1px solid var(--ui-border-color);
     background: var(--ui-card-color);
 }
 
 .brand-logo {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
     color: var(--ui-icon-color);
     font-size: 32px;
-    flex-shrink: 0;
 }
 
 .brand-text {
@@ -1025,6 +1034,10 @@ setInterval(() => {
     font-weight: 700;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+.app-sider:not(.is-collapsed) :deep(.n-menu-item-content__icon) {
+    margin-right: var(--ui-space-3) !important;
 }
 
 .app-footer {
