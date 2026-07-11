@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const root = ref<HTMLElement | null>(null);
 const currentIndex = ref(0);
+const slideDirection = ref<-1 | 1>(1);
 const pointerInside = ref(false);
 const focusInside = ref(false);
 let rotationTimer: ReturnType<typeof setInterval> | null = null;
@@ -17,6 +18,9 @@ let rotationTimer: ReturnType<typeof setInterval> | null = null;
 const currentAdvertisement = computed(() => props.advertisements[currentIndex.value] ?? null);
 const hasControls = computed(() => props.advertisements.length > 1);
 const isPaused = computed(() => pointerInside.value || focusInside.value);
+const transitionName = computed(() =>
+    slideDirection.value === 1 ? 'advertisement-forward' : 'advertisement-backward'
+);
 
 function isInteractionPaused() {
     return isPaused.value || root.value?.matches(':hover, :focus-within') === true;
@@ -39,11 +43,17 @@ function startTimer() {
 function showRelative(direction: -1 | 1, resetTimer = true) {
     const length = props.advertisements.length;
     if (length < 2) return;
+    slideDirection.value = direction;
     currentIndex.value = (currentIndex.value + direction + length) % length;
     if (resetTimer) startTimer();
 }
 
 function showAdvertisement(index: number) {
+    if (index === currentIndex.value) {
+        startTimer();
+        return;
+    }
+    slideDirection.value = index > currentIndex.value ? 1 : -1;
     currentIndex.value = index;
     startTimer();
 }
@@ -79,27 +89,33 @@ onBeforeUnmount(stopTimer);
     >
         <div class="advertisement-frame">
             <div class="adblock-fallback">若要查看此内容，请关闭 AdBlock 类插件</div>
-            <a
-                v-if="currentAdvertisement.targetUrl"
-                :key="currentAdvertisement.id"
-                class="advertisement-link"
-                :href="currentAdvertisement.targetUrl"
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-            >
-                <img
-                    class="advertisement-image"
-                    :src="currentAdvertisement.imageUrl"
-                    :alt="currentAdvertisement.altText"
-                />
-            </a>
-            <img
-                v-else
-                :key="currentAdvertisement.id"
-                class="advertisement-image"
-                :src="currentAdvertisement.imageUrl"
-                :alt="currentAdvertisement.altText"
-            />
+            <Transition :name="transitionName">
+                <a
+                    v-if="currentAdvertisement.targetUrl"
+                    :key="currentAdvertisement.id"
+                    class="advertisement-link"
+                    :href="currentAdvertisement.targetUrl"
+                    target="_blank"
+                    rel="noopener noreferrer sponsored"
+                >
+                    <img
+                        class="advertisement-image"
+                        :src="currentAdvertisement.imageUrl"
+                        :alt="currentAdvertisement.altText"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </a>
+                <div v-else :key="currentAdvertisement.id" class="advertisement-static">
+                    <img
+                        class="advertisement-image"
+                        :src="currentAdvertisement.imageUrl"
+                        :alt="currentAdvertisement.altText"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </div>
+            </Transition>
 
             <span class="advertisement-label">广告</span>
 
@@ -169,7 +185,8 @@ onBeforeUnmount(stopTimer);
     text-align: center;
 }
 
-.advertisement-link {
+.advertisement-link,
+.advertisement-static {
     position: absolute;
     inset: 0;
 }
@@ -181,9 +198,34 @@ onBeforeUnmount(stopTimer);
     object-fit: cover;
 }
 
-.advertisement-frame > .advertisement-image {
-    position: absolute;
-    inset: 0;
+.advertisement-forward-enter-active,
+.advertisement-forward-leave-active,
+.advertisement-backward-enter-active,
+.advertisement-backward-leave-active {
+    transition:
+        transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+}
+
+.advertisement-forward-enter-from {
+    opacity: 0.7;
+    transform: translateX(100%);
+}
+
+.advertisement-forward-leave-to {
+    opacity: 0.7;
+    transform: translateX(-100%);
+}
+
+.advertisement-backward-enter-from {
+    opacity: 0.7;
+    transform: translateX(-100%);
+}
+
+.advertisement-backward-leave-to {
+    opacity: 0.7;
+    transform: translateX(100%);
 }
 
 .advertisement-label {
@@ -196,6 +238,7 @@ onBeforeUnmount(stopTimer);
     background: rgba(15, 23, 42, 0.66);
     font-size: 11px;
     line-height: 1.4;
+    z-index: 2;
 }
 
 .carousel-control {
@@ -205,7 +248,19 @@ onBeforeUnmount(stopTimer);
     height: 32px;
     color: #ffffff;
     background: rgba(15, 23, 42, 0.58);
+    opacity: 0;
+    pointer-events: none;
     transform: translateY(-50%);
+    transition:
+        opacity 180ms ease,
+        background-color 180ms ease;
+    z-index: 2;
+}
+
+.advertisement-carousel:hover .carousel-control,
+.advertisement-carousel:focus-within .carousel-control {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .carousel-control:hover,
@@ -230,6 +285,7 @@ onBeforeUnmount(stopTimer);
     display: flex;
     justify-content: center;
     gap: var(--ui-space-2);
+    z-index: 2;
 }
 
 .carousel-indicator {
