@@ -17,7 +17,7 @@ export class WorkflowDeduplication extends BaseEntity {
     @PrimaryColumn({ type: 'varchar', length: 191 })
     key: string;
 
-    @Column({ name: 'workflow_id', type: 'varchar', length: 36 })
+    @Column({ name: 'workflow_id', type: 'varchar' })
     workflowId: string;
 
     @ManyToOne(() => Workflow, { onDelete: 'CASCADE' })
