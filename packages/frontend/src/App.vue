@@ -28,7 +28,11 @@
                         @mouseenter="handleMouseEnter"
                         @mouseleave="handleMouseLeave"
                     >
-                        <div class="brand-shell" @click="handleMenuSelect('home')">
+                        <div
+                            class="brand-shell"
+                            :style="{ cursor: sidebarLogoNavEnabled ? 'pointer' : undefined }"
+                            @click="sidebarLogoNavEnabled ? handleMenuSelect('home') : undefined"
+                        >
                             <n-icon class="brand-logo" :component="LuoguLogo" />
                             <span v-if="!collapsed" class="brand-text">洛谷保存站</span>
                         </div>
@@ -264,6 +268,8 @@ const collapsed = ref(true);
 const manualToggle = ref(false);
 const mobileSiderOpen = ref(false);
 const trackingConsentBlocking = ref(true);
+const sidebarLogoNavEnabled = useLocalStorage(SIDEBAR_LOGO_NAV_STORAGE_KEY, true);
+provide('sidebarLogoNavEnabled', sidebarLogoNavEnabled);
 const touchStartX = ref(0);
 const touchStartY = ref(0);
 
@@ -460,7 +466,11 @@ const menuOptions = computed<MenuOption[]>(() => [
         : [])
 ]);
 
-import { THEME_MODE_STORAGE_KEY, THEME_STORAGE_KEY } from '@/utils/constants.ts';
+import {
+    THEME_MODE_STORAGE_KEY,
+    THEME_STORAGE_KEY,
+    SIDEBAR_LOGO_NAV_STORAGE_KEY
+} from '@/utils/constants.ts';
 import { useLocalStorage } from '@/composables/useLocalStorage.ts';
 
 const getInitialTheme = (): UiThemeVars => {
@@ -1018,7 +1028,6 @@ setInterval(() => {
     box-sizing: border-box;
     border-bottom: 1px solid var(--ui-border-color);
     background: var(--ui-card-color);
-    cursor: pointer;
 }
 
 .brand-logo {

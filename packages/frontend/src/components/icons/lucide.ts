@@ -49,6 +49,7 @@ export {
     Megaphone as MegaphoneOutline,
     Menu as MenuOutline,
     MessageCircleMore as ChatbubbleEllipsesOutline,
+    Navigation as NavigationOutline,
     MessagesSquare as ChatbubblesOutline,
     MessagesSquare as Qq,
     Network as GitNetworkOutline,
