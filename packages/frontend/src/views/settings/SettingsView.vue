@@ -326,8 +326,8 @@ onMounted(loadCurrentUser);
                 <n-space vertical size="large">
                     <div class="setting-row">
                         <div>
-                            <div class="setting-title">侧边栏Logo点击导航</div>
-                            <div class="setting-desc">启用后点击侧边栏Logo会跳转到首页</div>
+                            <div class="setting-title">侧边栏 Logo 点击导航</div>
+                            <div class="setting-desc">启用后点击侧边栏 Logo 会跳转到首页</div>
                         </div>
                         <n-switch v-model:value="logoNavEnabled" />
                     </div>
