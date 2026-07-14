@@ -279,7 +279,12 @@ function handleSearch() {
 .home-search :deep(.n-input-wrapper) {
     min-height: 54px;
     padding-left: var(--ui-space-5);
-    padding-right: var(--ui-space-1);
+    padding-right: var(--ui-space-4);
+}
+
+.home-search :deep(.n-input__input) {
+    display: flex;
+    align-items: center;
 }
 
 .home-search :deep(.n-input__input-el) {
