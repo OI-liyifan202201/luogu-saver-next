@@ -13,6 +13,8 @@ import rehypeKatex from 'rehype-katex';
 import type { ElementContent, Root } from 'hast';
 import { VFile } from 'vfile';
 
+const luoguCaptchaUrlFragment = 'https://www.luogu.com.cn/lg4/captcha';
+
 const headingAnchorIcon: ElementContent = {
     type: 'element',
     tagName: 'svg',
@@ -514,9 +516,19 @@ async function getProcessor() {
             };
         }
 
-        function remarkBV() {
+        function remarkImages() {
             return (tree: any) => {
                 visit(tree, 'image', (node: any) => {
+                    if (node.url.includes(luoguCaptchaUrlFragment)) {
+                        node.type = 'text';
+                        node.value = '[LUOGU CAPTCHA]';
+
+                        delete node.url;
+                        delete node.alt;
+                        delete node.title;
+                        return;
+                    }
+
                     if (node.url.startsWith('bilibili:')) {
                         const bilibiliUrl = node.url.substring(9);
                         const [videoID, queryString] = bilibiliUrl.split('?');
@@ -840,7 +852,7 @@ async function getProcessor() {
             .use(remarkCuteTable)
             .use(remarkCustomContainers)
             .use(remarkTableMergeMarkers)
-            .use(remarkBV)
+            .use(remarkImages)
             .use(remarkRehype, { allowDangerousHtml: true })
             .use(rehypeRaw)
             .use(rehypeApplyTableMerges)

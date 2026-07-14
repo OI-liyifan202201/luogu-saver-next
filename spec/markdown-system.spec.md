@@ -270,6 +270,17 @@ For a Markdown image whose URL starts with `bilibili:`, the renderer SHALL repla
 4. Optional query parameters `page` and `t` SHALL be copied; absent `page` defaults to `1`, absent `t` defaults to `0` and is omitted from the iframe URL.
 5. The iframe URL SHALL include `high_quality=1` and `autoplay=0`.
 
+## 12.1 Luogu CAPTCHA Image Placeholder
+
+For a Markdown image whose URL contains the exact case-sensitive substring
+`https://www.luogu.com.cn/lg4/captcha`, the renderer SHALL replace the complete image node with
+the plain text `[LUOGU CAPTCHA]`.
+
+The rendered HTML for a matched image SHALL NOT contain an `img` element or the matched image URL.
+
+A Markdown image whose URL does not contain that substring SHALL retain normal image rendering,
+except for the Bilibili conversion defined in Section 12.
+
 ## 13. Backend Endpoint
 
 `POST /markdown/render` SHALL accept request body `{ "markdown": string }`.
