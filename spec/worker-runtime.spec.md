@@ -103,9 +103,8 @@ If `pointGuard` exists:
 2. If it returns true, call `processor.process(job)`.
 3. If it returns false, compute `jitterDelay = pointGuard.getRegenerationInterval() + floor(random() * 4000)`.
 4. Move the job to delayed state at `Date.now() + jitterDelay`.
-5. Pause the worker once if no pause operation is already in progress.
-6. Resume the worker after `pointGuard.getRegenerationInterval()`.
-7. Throw `DelayedError`.
+5. Do not pause the worker or the queue.
+6. Throw `DelayedError`.
 
 ## 7. Worker Events
 

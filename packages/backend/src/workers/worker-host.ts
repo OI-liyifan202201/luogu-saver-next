@@ -19,7 +19,6 @@ import { normalizeErrorReason } from '@/utils/error-reason';
 export class WorkerHost<T extends CommonTask> {
     public worker: Worker<T>;
     private queueEvents: QueueEvents;
-    private isPausingWorker: boolean;
 
     constructor(
         queueName: string,
@@ -41,7 +40,6 @@ export class WorkerHost<T extends CommonTask> {
             },
             ...options
         });
-        this.isPausingWorker = false;
         this.setupEvents();
     }
 
@@ -59,29 +57,6 @@ export class WorkerHost<T extends CommonTask> {
             const regenInterval = this.pointGuard.getRegenerationInterval();
             const jitterDelay = regenInterval + Math.floor(Math.random() * 4000);
             await job.moveToDelayed(Date.now() + jitterDelay, job.token);
-            if (!this.isPausingWorker) {
-                this.isPausingWorker = true;
-                setImmediate(async () => {
-                    try {
-                        await this.worker.pause(false);
-                        // Stop the worker immediately
-                        setTimeout(() => {
-                            try {
-                                this.worker.resume();
-                            } catch {
-                                logger.error(
-                                    { name: this.worker.name },
-                                    'Failed to resume the queue.'
-                                );
-                            } finally {
-                                this.isPausingWorker = false;
-                            }
-                        }, regenInterval);
-                    } catch {
-                        logger.error({ name: this.worker.name }, 'Failed to pause the worker.');
-                    }
-                });
-            }
             throw new DelayedError();
         }
 
@@ -116,14 +91,6 @@ export class WorkerHost<T extends CommonTask> {
                     'Task completed successfully'
                 );
             }
-        });
-
-        this.worker.on('paused', () => {
-            logger.debug({ name: this.worker.name }, 'Worker paused.');
-        });
-
-        this.worker.on('resumed', () => {
-            logger.debug({ name: this.worker.name }, 'Worker resumed.');
         });
 
         this.worker.on('failed', async (job, err) => {
